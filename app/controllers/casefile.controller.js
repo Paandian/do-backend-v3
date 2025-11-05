@@ -68,6 +68,52 @@ exports.create = (req, res) => {
     });
 };
 
+// Retrieve paginated Casefiles from the database.
+exports.findPaginated = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 30;
+    const offset = (page - 1) * pageSize;
+    const where = {};
+
+    // Example filters (expand as needed)
+    if (req.query.insuredName) {
+      where.insuredName = { [Op.like]: `%${req.query.insuredName}%` };
+    }
+    if (req.query.refType) {
+      where.refType = req.query.refType;
+    }
+    if (req.query.branch) {
+      where.branch = req.query.branch;
+    }
+    if (req.query.status) {
+      where.fileStatus = req.query.status;
+    }
+    if (req.query.insurer) {
+      where.insurer = req.query.insurer;
+    }
+    // Add more filters as needed
+
+    const { count, rows } = await Casefile.findAndCountAll({
+      where,
+      limit: pageSize,
+      offset,
+      order: [["dateOfAssign", "DESC"]],
+    });
+
+    res.send({
+      data: rows,
+      total: count,
+      page,
+      pageSize,
+    });
+  } catch (err) {
+    res.status(500).send({
+      message: err.message || "Error retrieving paginated Casefiles.",
+    });
+  }
+};
+
 // Retrieve all Casefiles from the database.
 exports.findAll = (req, res) => {
   const insuredName = req.query.insuredName;

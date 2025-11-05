@@ -7,6 +7,9 @@ module.exports = (app) => {
   // Create a new casefile
   router.post("/", casefiles.create);
 
+  // Retrieve paginated casefiles
+  router.get("/paginated", casefiles.findPaginated);
+
   // Retrieve all casefiles
   router.get("/", async (req, res) => {
     try {
