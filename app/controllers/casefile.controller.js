@@ -76,29 +76,19 @@ exports.findPaginated = async (req, res) => {
     const offset = (page - 1) * pageSize;
     const where = {};
 
-    // Example filters (expand as needed)
-    if (req.query.insuredName) {
-      where.insuredName = { [Op.like]: `%${req.query.insuredName}%` };
-    }
-    if (req.query.refType) {
-      where.refType = req.query.refType;
-    }
-    if (req.query.branch) {
-      where.branch = req.query.branch;
-    }
-    if (req.query.status) {
-      where.fileStatus = req.query.status;
-    }
-    if (req.query.insurer) {
-      where.insurer = req.query.insurer;
-    }
-    // Add more filters as needed
+    // ...existing filters...
+
+    // Calculate days difference using MySQL DATEDIFF
+    const daysDiffExpr = db.Sequelize.literal(`DATEDIFF(NOW(), dateOfAssign)`);
 
     const { count, rows } = await Casefile.findAndCountAll({
       where,
       limit: pageSize,
       offset,
-      order: [["dateOfAssign", "DESC"]],
+      attributes: {
+        include: [[daysDiffExpr, "days"]],
+      },
+      order: [[daysDiffExpr, "DESC"]],
     });
 
     res.send({
