@@ -1,0 +1,41 @@
+// ACESS REST CLIENT 
+
+// Create a new Role
+###
+post http://localhost:8080/api/access
+Content-Type: application/json
+
+
+{
+    "name": "newrole"
+}
+
+
+# Get All Roles
+###
+get http://localhost:8080/api/access
+
+# Get single Role
+###
+get http://localhost:8080/api/access/9
+
+# Update a Role
+###
+put http://localhost:8080/api/access/9
+Content-Type: application/json
+
+{
+    "name": "staff"
+}
+
+
+# Find all Roles which username contains admin
+###
+get http://localhost:8080/api/access?name=admin
+
+
+# Delete a member
+###
+delete http://localhost:8080/api/access/3
+
+

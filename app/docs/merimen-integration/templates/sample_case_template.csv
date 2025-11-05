@@ -1,0 +1,11 @@
+claim_number,policy_number,insured_name,vehicle_number,loss_date,loss_time,loss_location,loss_description,contact_person,contact_number,email,vehicle_make,vehicle_model,vehicle_year,workshop_name
+MER20231124001,POL-123456,John Doe,WBA1234,2023-11-24,14:30,Jalan Ampang KL,Front collision damage at traffic light,John Doe,+60123456789,john.doe@email.com,Honda,Civic,2022,ABC Workshop
+MER20231124002,POL-789012,Jane Smith,WBB5678,2023-11-24,15:45,Jalan Bukit Bintang,Side mirror damage while parking,Jane Smith,+60198765432,jane.smith@email.com,Toyota,Camry,2021,XYZ Motors
+MER20231124003,POL-345678,Ahmad Ismail,WBC9012,2023-11-24,09:15,Putrajaya Bridge,Rear end collision,Ahmad Ismail,+60123789456,ahmad.i@email.com,Proton,X70,2023,Speed Auto Care
+MER20231125001,POL-901234,Sarah Lee,WBD3456,2023-11-25,11:20,KLIA Highway,Multiple vehicle accident,Sarah Lee,+60167891234,sarah.lee@email.com,BMW,320i,2020,Premium Auto
+MER20231125002,POL-567890,Raj Kumar,WBE7890,2023-11-25,16:05,Petaling Jaya SS2,Hit and run incident,Raj Kumar,+60145678901,raj.k@email.com,Perodua,Myvi,2021,PJ Car Service
+MER20231125003,POL-234567,Lisa Wong,WBF2345,2023-11-25,08:40,Mont Kiara,Scratch damage in parking lot,Lisa Wong,+60132345678,lisa.w@email.com,Mercedes,C200,2022,Benz Service Center
+MER20231126001,POL-678901,Mike Tan,WBG6789,2023-11-26,13:50,Subang Jaya,Water damage due to flood,Mike Tan,+60178901234,mike.t@email.com,Nissan,X-Trail,2019,Subang Auto
+MER20231126002,POL-890123,Siti Aminah,WBH1234,2023-11-26,17:25,Shah Alam,Vandalism in parking area,Siti Aminah,+60156789012,siti.a@email.com,Honda,HR-V,2023,Shah Alam Motors
+MER20231126003,POL-456789,David Chen,WBI5678,2023-11-26,10:10,Bangsar South,Tree fell on vehicle,David Chen,+60187654321,david.c@email.com,Volvo,XC40,2022,Swedish Auto
+MER20231127001,POL-012345,Nurul Hassan,WBJ9012,2023-11-27,12:35,Damansara Heights,Side collision at roundabout,Nurul Hassan,+60143456789,nurul.h@email.com,Toyota,Vios,2021,Toyota Service KL

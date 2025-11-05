@@ -1,0 +1,45 @@
+
+// Create a new Branch
+###
+post http://localhost:8080/api/branches
+Content-Type: application/json
+
+
+{
+    "name": "Kuala Lumpur",
+    "brCode": "KL",
+    "updatedAt": "2019-12-13T01:13:57.650Z",
+    "createdAt": "2019-12-13T01:13:57.650Z"
+}
+
+
+# Get All Branches
+###
+get http://localhost:8080/api/branches
+
+# Get single Branch
+###
+get http://localhost:8080/api/branches/1
+
+# Update a Branch
+###
+put http://localhost:8080/api/branches/4
+Content-Type: application/json
+
+{
+    "name": "Kuala Terengganu",
+    "brCode": "KT"
+}
+
+
+# Find all Branches which title contains ‘kuala’
+###
+get http://localhost:8080/api/branches?name=kuala
+
+
+# Delete a Branch
+###
+delete http://localhost:8080/api/branches/3
+
+
+

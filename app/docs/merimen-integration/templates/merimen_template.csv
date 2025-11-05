@@ -1,0 +1,14 @@
+# CSV Template for Merimen Cases Upload
+# Field descriptions:
+# merimen_ref    - Unique reference number (required)
+# claim_no       - Claim number
+# vehicle_no     - Vehicle registration number
+# date_of_loss   - Date of loss (YYYY-MM-DD)
+# date_received  - Date and time received (YYYY-MM-DD HH:mm:ss)
+# status        - Case status (default: NEW)
+# raw_data      - Additional data in JSON format
+#
+# Note: Fields marked with (required) must not be empty
+#
+merimen_ref,claim_no,vehicle_no,date_of_loss,date_received,status,raw_data
+MER123456,CLM/2024/001,ABC1234,2024-01-01,2024-01-02 09:00:00,NEW,{"additional":"data"}

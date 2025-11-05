@@ -1,0 +1,189 @@
+// SENDLINK
+###
+post http://localhost:8080/api/members/reset/sendlink
+Content-Type: application/x-www-form-urlencoded
+
+email=m.paandian@gmail.com
+
+
+
+// SENDLINK
+###
+post http://localhost:8080/api/members/reset/sendlink
+Content-Type: multipart/form-data
+
+{
+    "email": "jb.adjuster@email.com"
+}
+
+
+# SENDMAIL
+// test nodemailer
+###
+post http://localhost:8080/api/send 
+Content-Type: multipart/form-data
+
+{
+    "refType": "BI",
+    "subRefType": "BRIEF",
+    "year": "22",
+    "branch": "Johor"
+}
+
+
+# SIGNUP
+// moderator signup
+post http://localhost:8080/api/auth/signup
+Content-Type: application/json
+
+{
+    "username": "mod",
+    "email": "mod@email.com",
+    "password": "123456",
+    "active": true,
+    "roles": ["moderator", "user"]
+}
+
+// admin signup
+###
+post http://localhost:8080/api/auth/signup
+Content-Type: application/json
+
+{
+    "username": "admin",
+    "email": "admin@email.com",
+    "password": "123456",
+    "active": true,
+    "roles": ["admin"]
+}
+
+// user signup
+###
+post http://localhost:8080/api/auth/signup
+Content-Type: application/json
+
+{
+    "username": "user",
+    "email": "user@email.com",
+    "password": "123456",
+    "active": true,
+    "roles": ["user"]
+}
+
+# SIGNIN
+// moderator signin
+###
+post http://localhost:8080/api/auth/signin
+Content-Type: application/json
+
+{
+    "username": "mod5",
+    "password": "123456"
+}
+
+// admin signin
+###
+post http://localhost:8080/api/auth/signin
+Content-Type: application/json
+
+{
+    "username": "admin",
+    "password": "123456"
+}
+
+// user signin
+###
+post http://localhost:8080/api/auth/signin
+Content-Type: application/json
+
+{
+    "username": "user",
+    "password": "123456"
+}
+
+// for public access
+###
+get http://localhost:8080/api/test/all
+
+
+// for loggedin users (role: user/moderator/admin)
+###
+get http://localhost:8080/api/test/user
+x-access-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6OSwiaWF0IjoxNjMwNTU3MzYzLCJleHAiOjE2MzA1NjA5NjN9.2tUsMKXKTpUGhXU92NiSYf2lPVRBK273jcFTrzj9Xu4
+
+
+// for users having moderator role
+###
+get http://localhost:8080/api/test/mod
+x-access-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6OSwiaWF0IjoxNjMwNTU3MzYzLCJleHAiOjE2MzA1NjA5NjN9.2tUsMKXKTpUGhXU92NiSYf2lPVRBK273jcFTrzj9Xu4
+
+// for users having admin role
+###
+get http://localhost:8080/api/test/admin
+x-access-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6OSwiaWF0IjoxNjMwNTU3MzYzLCJleHAiOjE2MzA1NjA5NjN9.2tUsMKXKTpUGhXU92NiSYf2lPVRBK273jcFTrzj9Xu4
+
+# REFRESHTOKEN
+// moderator signup
+###
+post http://localhost:8080/api/auth/refreshtoken
+Content-Type: application/json
+
+{
+    "refreshToken": "bd955d1d-23c8-41c8-a771-9e45415f98c5"
+}
+
+
+
+
+
+
+
+// MEMBERS REST CLIENT 
+
+// Create a new Member
+###
+post http://localhost:8080/api/members
+Content-Type: application/json
+
+
+{
+    "username": "mod",
+    "email": "mod@email.com",
+    "password": "123456",
+    "active": true,
+    "roles": ["moderator", "user"]
+}
+
+
+# Get All Members
+###
+get http://localhost:8080/api/members
+
+# Get single Member
+###
+get http://localhost:8080/api/members/2
+
+# Update a Member
+###
+put http://localhost:8080/api/members/2
+Content-Type: application/json
+
+{
+    "active": true
+}
+
+
+# Find all Members which username contains ‘node’
+###
+get http://localhost:8080/api/members?username=admin
+
+# Find all active members
+###
+get http://localhost:8080/api/members/active
+
+
+# Delete a member
+###
+delete http://localhost:8080/api/members/3
+
+

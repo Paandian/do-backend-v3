@@ -1,0 +1,92 @@
+// MEMBERS REST CLIENT 
+  // Create a new Merimen case
+  //router.post("/", merimen.create);
+
+  // Retrieve all Merimen cases
+  //router.get("/", merimen.findAll);
+
+  // Retrieve a single Merimen case by id
+  //router.get("/:id", merimen.findOne);
+
+  // Process a Merimen case
+  //router.post("/:id/process", merimen.process);
+
+  // Update Merimen case status
+  //router.put("/:id/status", merimen.updateStatus);
+
+  // Delete a Merimen case
+  //router.delete("/:id", merimen.delete);
+
+  // Register routes
+  // app.use("/api/merimen-cases", router);
+
+
+
+
+# Get All Merimen Cases
+###
+get http://localhost:8080/api/merimen-cases
+
+# Get single Merimen Case
+###
+get http://localhost:8080/api/merimen-cases/16
+
+# Update a Member
+###
+put http://localhost:8080/api/merimen-cases/16/status  
+Content-Type: application/json
+
+{
+    "status":"VERIFIED"
+}
+
+# Delete a Merimen Case
+###
+delete http://localhost:8080/api/merimen-cases/16
+
+
+// Create a Merimen Case
+###
+post http://localhost:8080/api/merimen-cases
+Content-Type: application/json
+
+
+{
+    "merimen_ref":"M123464",
+    "claim_no":"C123464",
+    "vehicle_no":"W1234",
+    "date_of_loss":"2021-09-01",
+    "date_received":"2021-09-01",
+    "status":"NEW",
+    "raw_data":{},
+    "is_processed":false,
+    "error_message":null,
+    "processing_attempts":0,
+    "last_attempt_at":null
+}
+
+
+###
+// Cannot add casefile_id and insurer_id
+//    "casefile_id":"1",
+  //  "insurer_id":"1",
+
+
+
+# Find all Members which username contains ‘node’
+###
+get http://localhost:8080/api/members?username=admin
+
+# Find all active members
+###
+get http://localhost:8080/api/members/active
+
+
+# Delete a member
+###
+delete http://localhost:8080/api/members/3
+
+
+# Delete ALL members
+###
+delete http://localhost:8080/api/localhost:8080/api/members/

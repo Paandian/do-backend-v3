@@ -1,0 +1,44 @@
+// const { authJwt } = require("../middleware");
+module.exports = (app) => {
+  const casefiles = require("../controllers/casefile.controller");
+
+  var router = require("express").Router();
+
+  // Create a new casefile
+  router.post("/", casefiles.create);
+
+  // Retrieve all casefiles
+  router.get("/", async (req, res) => {
+    try {
+      const result = await casefiles.findAll(req, res);
+      return result;
+    } catch (err) {
+      console.error("Error in /api/casefiles:", err);
+      return res.status(500).json({
+        message:
+          err.message || "Some error occurred while retrieving casefiles.",
+      });
+    }
+  });
+
+  // Retrieve all casefiles with refType
+  // router.get("/:refType", casefiles.findAllRefType);
+
+  // Retrieve all casefiles with branch
+  // router.get("/:branch", casefiles.findAllBranch);
+
+  // Retrieve a single casefile with id
+  router.get("/:id", casefiles.findOne);
+
+  // Update a casefile with id
+  router.put("/:id", casefiles.update);
+
+  // Delete a casefile with id
+  router.delete("/:id", casefiles.delete);
+
+  // Delete all casefiles
+  // router.delete("/", casefiles.deleteAll);
+
+  // app.use("/api/casefiles", [authJwt.verifyToken], router);
+  app.use("/api/casefiles", router);
+};

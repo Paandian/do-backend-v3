@@ -1,0 +1,195 @@
+// MEMBERS REST CLIENT 
+
+// Create a new Member
+### ADMIN
+post http://localhost:8080/api/members
+Content-Type: application/json
+
+
+{
+    "username": "admin",
+    "fullname": "Administrator",
+    "nric": "1234-05-6789",
+    "email": "admin@email.com",
+    "password": "123456",
+    "telnumber": "6012-3456789",
+    "datejoined": "",
+    "position": "Admin",
+    "empid": "1001",
+    "usercode": "ADM",
+    "address": "",
+    "emcontactname": "John",
+    "emcontactno": "6012-3456788",
+    "active": true,
+    "roles": ["admin"],
+    "branches": ["1"],
+    "depts": ["1"]
+}
+
+### MANAGER
+post http://localhost:8080/api/members
+Content-Type: application/json
+
+
+{
+    "username": "manager",
+    "email": "manager@email.com",
+    "password": "123456",
+    "fullname": "Manager",
+    "nric": "1234-05-0000",
+    "telnumber": "6019-3456789",
+    "datejoined": "",
+    "position": "Manager",
+    "empid": "1002",
+    "usercode": "MGR",
+    "address": "",
+    "emcontactname": "Steven",
+    "emcontactno": "6019-3456788",
+    "active": true,
+    "roles": ["manager"],
+    "branches": ["1", "2"],
+    "depts": ["1", "2", "3"]
+}
+
+### MANAGER & ADJUSTER
+post http://localhost:8080/api/members
+Content-Type: application/json
+
+
+{
+    "username": "manadj",
+    "email": "manadj@email.com",
+    "password": "123456",
+    "fullname": "Manager cum Adjuster",
+    "nric": "1234-05-1111",
+    "telnumber": "6017-3456789",
+    "datejoined": "",
+    "position": "Manager",
+    "empid": "1003",
+    "usercode": "BRM",
+    "address": "",
+    "emcontactname": "Kenny",
+    "emcontactno": "6016-3456788",
+    "active": true,
+    "roles": ["manager", "adjuster"],
+    "branches": ["1", "2"],
+    "depts": ["1", "2"]
+}
+
+
+### ADJUSTER
+post http://localhost:8080/api/members
+Content-Type: application/json
+
+
+{
+    "username": "adjuster",
+    "email": "adjuster@email.com",
+    "password": "123456",
+    "active": true,
+    "roles": ["adjuster"],
+    "branches": ["1"],
+    "depts": ["1"]
+}
+
+### EDITOR & ADJUSTER
+post http://localhost:8080/api/members
+Content-Type: application/json
+
+
+{
+    "username": "ediadj",
+    "email": "ediadj@email.com",
+    "password": "123456",
+    "active": true,
+    "roles": ["editor", "adjuster"],
+    "branches": ["2", "3"],
+    "depts": ["1", "3"]
+}
+
+
+
+
+# SIGNIN
+
+// ADMIN signin
+###
+post http://localhost:8080/api/auth/signin
+Content-Type: application/json
+
+{
+    "email": "admin@email.com",
+    "password": "123456"
+}
+
+// MANAGER signin
+###
+post http://localhost:8080/api/auth/signin
+Content-Type: application/json
+
+{
+    "email": "manager@email.com",
+    "password": "123456"
+}
+
+
+// for public access
+###
+get http://localhost:8080/api/test/all
+
+
+// for loggedin users (role: user/manager/admin)
+###
+get http://localhost:8080/api/test/user
+x-access-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiaWF0IjoxNjMxNDI1MjQzLCJleHAiOjE2MzE0Mjg4NDN9.xYPX7eO49vc-ZOaEUYcIViTZnOpiVedO2cejMbEBFf0
+
+
+// for users having manager role
+###
+get http://localhost:8080/api/test/manager
+x-access-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiaWF0IjoxNjMxNDI1MjQzLCJleHAiOjE2MzE0Mjg4NDN9.xYPX7eO49vc-ZOaEUYcIViTZnOpiVedO2cejMbEBFf0
+
+
+// for users having admin role
+###
+get http://localhost:8080/api/test/admin
+x-access-token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiaWF0IjoxNjU0ODc3MjEwLCJleHAiOjE2NTQ4ODA4MTB9.awDC-fAWzM0X-D5yqGTyUiDgYuHzAwqtInwdnoJ7jN0
+
+
+
+
+# Get All Members
+###
+get http://localhost:8080/api/members
+
+# Get single Member
+###
+get http://localhost:8080/api/members/6
+
+# Update a Member
+###
+put http://localhost:8080/api/members/2
+Content-Type: application/json
+
+{
+    "active": true
+}
+
+
+# Find all Members which username contains ‘node’
+###
+get http://localhost:8080/api/members?username=admin
+
+# Find all active members
+###
+get http://localhost:8080/api/members/active
+
+
+# Delete a member
+###
+delete http://localhost:8080/api/members/3
+
+
+# Delete ALL members
+###
+delete http://localhost:8080/api/localhost:8080/api/members/
