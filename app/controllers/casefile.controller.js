@@ -104,14 +104,59 @@ exports.findPaginated = async (req, res) => {
   }
 };
 
+function buildUserWhere(query) {
+  const { roles, dept, branches, userId } = query;
+  let where = {};
+
+  if (!roles) return where;
+
+  // Parse roles if sent as JSON string
+  let rolesArr = Array.isArray(roles)
+    ? roles
+    : typeof roles === "string"
+    ? JSON.parse(roles)
+    : [];
+  let deptArr = Array.isArray(dept)
+    ? dept
+    : typeof dept === "string"
+    ? JSON.parse(dept)
+    : [];
+  let branchesArr = Array.isArray(branches)
+    ? branches
+    : typeof branches === "string"
+    ? JSON.parse(branches)
+    : [];
+
+  if (
+    rolesArr.includes("MANAGER") ||
+    rolesArr.includes("ADMIN") ||
+    rolesArr.includes("CLERK")
+  ) {
+    // No extra filter
+  } else if (
+    rolesArr.includes("BRANCHCLERK") ||
+    rolesArr.includes("BRANCHMANAGER")
+  ) {
+    if (deptArr.length) where.refType = { [Op.in]: deptArr };
+    if (branchesArr.length) where.branch = { [Op.in]: branchesArr };
+  } else if (rolesArr.includes("ADJUSTER")) {
+    if (deptArr.length) where.refType = { [Op.in]: deptArr };
+    if (branchesArr.length) where.branch = { [Op.in]: branchesArr };
+    if (userId) where.adjuster = userId;
+  }
+  // Add more role logic if needed
+  return where;
+}
+
 // Retrieve paginated Casefiles except fileStatus "CANC" or "CLO"
 exports.findPaginatedActive = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.pageSize) || 30;
     const offset = (page - 1) * pageSize;
-    const where = {
+    let where = {
       fileStatus: { [Op.notIn]: ["CANC", "CLO"] },
+      ...buildUserWhere(req.query),
     };
 
     const daysDiffExpr = db.Sequelize.literal(`DATEDIFF(NOW(), dateOfAssign)`);
@@ -145,8 +190,9 @@ exports.findPaginatedClosed = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.pageSize) || 30;
     const offset = (page - 1) * pageSize;
-    const where = {
+    let where = {
       fileStatus: { [Op.in]: ["CANC", "CLO"] },
+      ...buildUserWhere(req.query),
     };
 
     const daysDiffExpr = db.Sequelize.literal(`DATEDIFF(NOW(), dateOfAssign)`);
