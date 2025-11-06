@@ -104,6 +104,76 @@ exports.findPaginated = async (req, res) => {
   }
 };
 
+// Retrieve paginated Casefiles except fileStatus "CANC" or "CLO"
+exports.findPaginatedActive = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 30;
+    const offset = (page - 1) * pageSize;
+    const where = {
+      fileStatus: { [Op.notIn]: ["CANC", "CLO"] },
+    };
+
+    const daysDiffExpr = db.Sequelize.literal(`DATEDIFF(NOW(), dateOfAssign)`);
+
+    const { count, rows } = await Casefile.findAndCountAll({
+      where,
+      limit: pageSize,
+      offset,
+      attributes: {
+        include: [[daysDiffExpr, "days"]],
+      },
+      order: [[daysDiffExpr, "DESC"]],
+    });
+
+    res.send({
+      data: rows,
+      total: count,
+      page,
+      pageSize,
+    });
+  } catch (err) {
+    res.status(500).send({
+      message: err.message || "Error retrieving active paginated Casefiles.",
+    });
+  }
+};
+
+// Retrieve paginated Casefiles with fileStatus "CANC" or "CLO" only
+exports.findPaginatedClosed = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 30;
+    const offset = (page - 1) * pageSize;
+    const where = {
+      fileStatus: { [Op.in]: ["CANC", "CLO"] },
+    };
+
+    const daysDiffExpr = db.Sequelize.literal(`DATEDIFF(NOW(), dateOfAssign)`);
+
+    const { count, rows } = await Casefile.findAndCountAll({
+      where,
+      limit: pageSize,
+      offset,
+      attributes: {
+        include: [[daysDiffExpr, "days"]],
+      },
+      order: [[daysDiffExpr, "DESC"]],
+    });
+
+    res.send({
+      data: rows,
+      total: count,
+      page,
+      pageSize,
+    });
+  } catch (err) {
+    res.status(500).send({
+      message: err.message || "Error retrieving closed paginated Casefiles.",
+    });
+  }
+};
+
 // Retrieve all Casefiles from the database.
 exports.findAll = (req, res) => {
   const insuredName = req.query.insuredName;
