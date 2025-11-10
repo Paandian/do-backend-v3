@@ -69,6 +69,94 @@ exports.create = (req, res) => {
     });
 };
 
+// Helper functions to get display names (simulate what reportsTwo.vue does)
+async function getMetaData() {
+  // Use correct model for adjusters and handlers
+  // Adjusters: db.user (filter by roleCode 'adjuster')
+  // Handlers: db.handler
+  const [
+    insurers,
+    branches,
+    departments,
+    subRefTypes,
+    handlers,
+    stages,
+    users,
+  ] = await Promise.all([
+    db.inss.findAll(),
+    db.branch.findAll(),
+    db.dept.findAll(),
+    db.subDept.findAll(),
+    db.handler.findAll(),
+    db.stages.findAll(),
+    db.user.findAll(),
+  ]);
+  // Adjusters: filter users by roleCode 'adjuster'
+  const adjusters = users.filter(
+    (u) =>
+      Array.isArray(u.roles) &&
+      u.roles.some(
+        (r) =>
+          (r.roleCode || r.code || r.name || "").toLowerCase() === "adjuster"
+      )
+  );
+  return {
+    insurers,
+    branches,
+    departments,
+    subRefTypes,
+    adjusters,
+    handlers,
+    stages,
+    users, // keep users for fallback
+  };
+}
+
+// Helper to get display value for filter keys
+function getFilterDisplay(key, value, meta) {
+  if (!value) return "";
+  switch (key) {
+    case "insurer":
+      return getNameById(meta.insurers, value);
+    case "branch":
+      return getNameById(meta.branches, value);
+    case "refType":
+      return getNameById(meta.departments, value);
+    case "subRefType":
+      return getSubCodeById(meta.subRefTypes, value);
+    case "adjuster":
+      return getUsernameById(meta.adjusters, value);
+    case "fileStatus":
+      return getStageNameByCode(meta.stages, value);
+    default:
+      return value;
+  }
+}
+
+function getNameById(arr, id, key = "name") {
+  if (!arr || !id) return "";
+  const found = arr.find((item) => String(item.id) === String(id));
+  return found ? found[key] : "";
+}
+
+function getSubCodeById(arr, id) {
+  if (!arr || !id) return "";
+  const found = arr.find((item) => String(item.id) === String(id));
+  return found ? found.subCode : "";
+}
+
+function getUsernameById(arr, id) {
+  if (!arr || !id) return "";
+  const found = arr.find((item) => String(item.id) === String(id));
+  return found ? found.username : "";
+}
+
+function getStageNameByCode(arr, code) {
+  if (!arr || !code) return "";
+  const found = arr.find((item) => String(item.stageCode) === String(code));
+  return found ? found.name : code;
+}
+
 // Retrieve paginated Casefiles from the database.
 exports.findPaginated = async (req, res) => {
   try {
@@ -102,49 +190,185 @@ exports.findPaginated = async (req, res) => {
 
     // If export=excel, return Excel file
     if (req.query.export === "excel") {
+      // Use same logic for both "Export All" and "Export Current Page"
       const rows = await Casefile.findAll({
         where,
         attributes: {
-          include: [[daysDiffExpr, "days"]],
+          include: [
+            [db.Sequelize.literal(`DATEDIFF(NOW(), dateOfAssign)`), "days"],
+          ],
         },
-        order: [[daysDiffExpr, "DESC"]],
+        order: [
+          [db.Sequelize.literal(`DATEDIFF(NOW(), dateOfAssign)`), "DESC"],
+        ],
+        // If page/pageSize are provided, apply limit/offset for "Export Current Page"
+        ...(req.query.page && req.query.pageSize
+          ? {
+              limit: parseInt(req.query.pageSize),
+              offset:
+                (parseInt(req.query.page) - 1) * parseInt(req.query.pageSize),
+            }
+          : {}),
       });
+
+      const meta = await getMetaData();
 
       // Create Excel workbook and worksheet
       const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet("Report");
+      const worksheet = workbook.addWorksheet("File Report");
 
-      // Define columns (adjust as needed)
+      // --- Cosmetic: Title ---
+      worksheet.mergeCells("A1:S1");
+      worksheet.getCell("A1").value = "AASB File Report";
+      worksheet.getCell("A1").font = { size: 16, bold: true };
+      worksheet.getCell("A1").alignment = {
+        vertical: "middle",
+        horizontal: "center",
+      };
+
+      // --- Cosmetic: Number of files ---
+      worksheet.mergeCells("A2:S2");
+      worksheet.getCell("A2").value = `Number of Files: ${rows.length}`;
+      worksheet.getCell("A2").font = { size: 12, bold: true };
+      worksheet.getCell("A2").alignment = {
+        vertical: "middle",
+        horizontal: "center",
+      };
+
+      // --- Cosmetic: Filtered by (show display names) ---
+      worksheet.mergeCells("A3:S3");
+      worksheet.getCell("A3").value =
+        "Filtered by: " +
+        (Object.entries(req.query)
+          .filter(
+            ([k, v]) => v && k !== "export" && k !== "page" && k !== "pageSize"
+          )
+          .map(([k, v]) => {
+            const display = getFilterDisplay(k, v, meta);
+            return display ? `${k}: ${display}` : "";
+          })
+          .filter(Boolean)
+          .join(", ") || "None");
+      worksheet.getCell("A3").font = { size: 11, italic: true };
+      worksheet.getCell("A3").alignment = {
+        vertical: "middle",
+        horizontal: "center",
+      };
+
+      // --- Cosmetic: Blank row before table ---
+      worksheet.addRow([]);
+
+      // --- Table header: add NO. column first ---
       worksheet.columns = [
-        { header: "Insurer", key: "insurer", width: 20 },
-        { header: "Branch", key: "branch", width: 20 },
-        { header: "Department", key: "refType", width: 20 },
-        { header: "File Classification", key: "subRefType", width: 20 },
-        { header: "Adjuster", key: "adjuster", width: 20 },
-        { header: "Vehicle No.", key: "vehicleNo", width: 20 },
-        { header: "AASB Reference", key: "id", width: 20 },
-        { header: "Date Of Assignment", key: "dateOfAssign", width: 20 },
-        { header: "Days", key: "days", width: 10 },
-        { header: "Status", key: "fileStatus", width: 20 },
+        { header: "NO.", key: "numbering", width: 7 },
+        { header: "CLAIMS HANDLER", key: "handler", width: 22 },
+        { header: "INSURER'S REF", key: "claimNo", width: 18 },
+        { header: "INSURED NAME", key: "insuredName", width: 22 },
+        { header: "VEHICLE NO", key: "vehicleNo", width: 18 },
+        { header: "INSURER", key: "insurer", width: 22 },
+        { header: "CLAIM TYPE", key: "claimType", width: 18 },
+        { header: "BRANCH", key: "branch", width: 18 },
+        { header: "DEPARTMENT", key: "department", width: 18 },
+        { header: "FILE CLASSIFICATION", key: "fileClassification", width: 22 },
+        { header: "ADJUSTER", key: "adjuster", width: 18 },
+        { header: "AASB REF", key: "aasbRef", width: 24 },
+        { header: "DATE OF ASSIGNMENT", key: "dateOfAssign", width: 18 },
+        { header: "DATE OF LOSS", key: "dateOfLoss", width: 18 },
+        { header: "DAYS", key: "days", width: 10 },
+        {
+          header: "ADJUSTER ACKNOWLEDMENT DATE",
+          key: "dateStartInv",
+          width: 22,
+        },
+        { header: "REPORT SUBMISSION DATE", key: "dateEndInv", width: 22 },
+        { header: "STATUS", key: "fileStatus", width: 18 },
+        {
+          header: "TOTAL AMOUNT OF ALL TAX INVOICES",
+          key: "invTotal",
+          width: 22,
+        },
       ];
 
-      // Add rows
-      rows.forEach((row) => {
-        worksheet.addRow({
-          insurer: row.insurer,
-          branch: row.branch,
-          refType: row.refType,
-          subRefType: row.subRefType,
-          adjuster: row.adjuster,
-          vehicleNo: row.vehicleNo,
-          id: row.id,
-          dateOfAssign: row.dateOfAssign,
-          days: row.dataValues.days,
-          fileStatus: row.fileStatus,
-        });
+      // --- Table header row ---
+      worksheet.addRow(worksheet.columns.map((col) => col.header));
+
+      // --- Table rows ---
+      rows.forEach((row, idx) => {
+        worksheet.addRow([
+          idx + 1,
+          getNameById(meta.handlers, row.handler) ||
+            getUsernameById(meta.users, row.handler),
+          row.claimNo || "",
+          row.insuredName || "",
+          row.vehicleNo ? row.vehicleNo.toUpperCase() : "",
+          getNameById(meta.insurers, row.insurer),
+          getNameById(meta.departments, row.refType),
+          getNameById(meta.branches, row.branch),
+          getNameById(meta.departments, row.refType),
+          getSubCodeById(meta.subRefTypes, row.subRefType),
+          getUsernameById(meta.adjusters, row.adjuster) ||
+            getUsernameById(meta.users, row.adjuster),
+          `AA/${getNameById(meta.departments, row.refType)}/${getSubCodeById(
+            meta.subRefTypes,
+            row.subRefType
+          )}/${row.id}/${
+            row.createdAt
+              ? new Date(row.createdAt).getFullYear().toString().slice(-2)
+              : ""
+          }/${getNameById(meta.branches, row.branch, "brCode")}`,
+          row.dateOfAssign
+            ? new Date(row.dateOfAssign).toLocaleDateString("en-GB")
+            : "",
+          row.dateOfLoss
+            ? new Date(row.dateOfLoss).toLocaleDateString("en-GB")
+            : "",
+          row.dataValues.days,
+          row.dateStartInv
+            ? new Date(row.dateStartInv).toLocaleDateString("en-GB")
+            : "",
+          row.dateEndInv
+            ? new Date(row.dateEndInv).toLocaleDateString("en-GB")
+            : "",
+          getStageNameByCode(meta.stages, row.fileStatus),
+          row.invTotal || "",
+        ]);
       });
 
-      // Set response headers
+      // --- Cosmetic: Style header row only ---
+      const headerRow = worksheet.getRow(5);
+      headerRow.font = { bold: true };
+      headerRow.alignment = { vertical: "middle", horizontal: "center" };
+      headerRow.eachCell((cell) => {
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFDDEEFF" },
+        };
+        cell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+      });
+
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber > 5) {
+          row.font = { bold: false };
+          row.alignment = { vertical: "middle", horizontal: "left" };
+          row.eachCell((cell) => {
+            cell.border = {
+              top: { style: "thin" },
+              left: { style: "thin" },
+              bottom: { style: "thin" },
+              right: { style: "thin" },
+            };
+          });
+        }
+      });
+
+      worksheet.views = [{ state: "frozen", ySplit: 5 }];
+
       res.setHeader(
         "Content-Type",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -156,13 +380,11 @@ exports.findPaginated = async (req, res) => {
           .slice(0, 10)}.xlsx`
       );
 
-      // Write workbook to response
       await workbook.xlsx.write(res);
       res.end();
       return;
     }
 
-    // ...existing paginated response...
     const { count, rows } = await Casefile.findAndCountAll({
       where,
       limit: pageSize,
