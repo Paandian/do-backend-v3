@@ -7,7 +7,7 @@ module.exports = (app) => {
   // Create a new casefile
   router.post("/", casefiles.create);
 
-  // Retrieve paginated casefiles
+  // Retrieve paginated casefiles (including Excel export)
   router.get("/paginated", casefiles.findPaginated);
 
   // Retrieve paginated active casefiles (not CANC or CLO)

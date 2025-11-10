@@ -1,4 +1,5 @@
 const db = require("../models");
+const ExcelJS = require("exceljs");
 const Casefile = db.casefiles;
 const Op = db.Sequelize.Op;
 
@@ -76,11 +77,92 @@ exports.findPaginated = async (req, res) => {
     const offset = (page - 1) * pageSize;
     const where = {};
 
-    // ...existing filters...
+    // Add filtering logic for each filter
+    if (req.query.insurer) where.insurer = req.query.insurer;
+    if (req.query.branch) where.branch = req.query.branch;
+    if (req.query.refType) where.refType = req.query.refType;
+    if (req.query.subRefType) where.subRefType = req.query.subRefType;
+    if (req.query.adjuster) where.adjuster = req.query.adjuster;
+    if (req.query.vehicleNo)
+      where.vehicleNo = { [Op.like]: `%${req.query.vehicleNo}%` };
+    if (req.query.startDate && req.query.endDate) {
+      where.dateOfAssign = {
+        [Op.between]: [req.query.startDate, req.query.endDate],
+      };
+    } else if (req.query.startDate) {
+      where.dateOfAssign = { [Op.gte]: req.query.startDate };
+    } else if (req.query.endDate) {
+      where.dateOfAssign = { [Op.lte]: req.query.endDate };
+    }
+    if (req.query.id) where.id = req.query.id;
+    if (req.query.fileStatus) where.fileStatus = req.query.fileStatus;
 
     // Calculate days difference using MySQL DATEDIFF
     const daysDiffExpr = db.Sequelize.literal(`DATEDIFF(NOW(), dateOfAssign)`);
 
+    // If export=excel, return Excel file
+    if (req.query.export === "excel") {
+      const rows = await Casefile.findAll({
+        where,
+        attributes: {
+          include: [[daysDiffExpr, "days"]],
+        },
+        order: [[daysDiffExpr, "DESC"]],
+      });
+
+      // Create Excel workbook and worksheet
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Report");
+
+      // Define columns (adjust as needed)
+      worksheet.columns = [
+        { header: "Insurer", key: "insurer", width: 20 },
+        { header: "Branch", key: "branch", width: 20 },
+        { header: "Department", key: "refType", width: 20 },
+        { header: "File Classification", key: "subRefType", width: 20 },
+        { header: "Adjuster", key: "adjuster", width: 20 },
+        { header: "Vehicle No.", key: "vehicleNo", width: 20 },
+        { header: "AASB Reference", key: "id", width: 20 },
+        { header: "Date Of Assignment", key: "dateOfAssign", width: 20 },
+        { header: "Days", key: "days", width: 10 },
+        { header: "Status", key: "fileStatus", width: 20 },
+      ];
+
+      // Add rows
+      rows.forEach((row) => {
+        worksheet.addRow({
+          insurer: row.insurer,
+          branch: row.branch,
+          refType: row.refType,
+          subRefType: row.subRefType,
+          adjuster: row.adjuster,
+          vehicleNo: row.vehicleNo,
+          id: row.id,
+          dateOfAssign: row.dateOfAssign,
+          days: row.dataValues.days,
+          fileStatus: row.fileStatus,
+        });
+      });
+
+      // Set response headers
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename=Report_${new Date()
+          .toISOString()
+          .slice(0, 10)}.xlsx`
+      );
+
+      // Write workbook to response
+      await workbook.xlsx.write(res);
+      res.end();
+      return;
+    }
+
+    // ...existing paginated response...
     const { count, rows } = await Casefile.findAndCountAll({
       where,
       limit: pageSize,
