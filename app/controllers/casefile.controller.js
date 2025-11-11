@@ -163,34 +163,16 @@ exports.findPaginated = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.pageSize) || 30;
     const offset = (page - 1) * pageSize;
-    const where = {};
+    // Combine role-based and filter-based constraints
+    const where = {
+      ...buildUserWhere(req.query),
+      ...buildFilters(req.query),
+    };
 
-    // Add filtering logic for each filter
-    if (req.query.insurer) where.insurer = req.query.insurer;
-    if (req.query.branch) where.branch = req.query.branch;
-    if (req.query.refType) where.refType = req.query.refType;
-    if (req.query.subRefType) where.subRefType = req.query.subRefType;
-    if (req.query.adjuster) where.adjuster = req.query.adjuster;
-    if (req.query.vehicleNo)
-      where.vehicleNo = { [Op.like]: `%${req.query.vehicleNo}%` };
-    if (req.query.startDate && req.query.endDate) {
-      where.dateOfAssign = {
-        [Op.between]: [req.query.startDate, req.query.endDate],
-      };
-    } else if (req.query.startDate) {
-      where.dateOfAssign = { [Op.gte]: req.query.startDate };
-    } else if (req.query.endDate) {
-      where.dateOfAssign = { [Op.lte]: req.query.endDate };
-    }
-    if (req.query.id) where.id = req.query.id;
-    if (req.query.fileStatus) where.fileStatus = req.query.fileStatus;
-
-    // Calculate days difference using MySQL DATEDIFF
     const daysDiffExpr = db.Sequelize.literal(`DATEDIFF(NOW(), dateOfAssign)`);
 
     // If export=excel, return Excel file
     if (req.query.export === "excel") {
-      // Use same logic for both "Export All" and "Export Current Page"
       const rows = await Casefile.findAll({
         where,
         attributes: {
@@ -201,7 +183,6 @@ exports.findPaginated = async (req, res) => {
         order: [
           [db.Sequelize.literal(`DATEDIFF(NOW(), dateOfAssign)`), "DESC"],
         ],
-        // If page/pageSize are provided, apply limit/offset for "Export Current Page"
         ...(req.query.page && req.query.pageSize
           ? {
               limit: parseInt(req.query.pageSize),
@@ -452,15 +433,39 @@ function buildUserWhere(query) {
   return where;
 }
 
+function buildFilters(query) {
+  const where = {};
+  if (query.insurer) where.insurer = query.insurer;
+  if (query.branch) where.branch = query.branch;
+  if (query.refType) where.refType = query.refType;
+  if (query.subRefType) where.subRefType = query.subRefType;
+  if (query.adjuster) where.adjuster = query.adjuster;
+  if (query.vehicleNo) where.vehicleNo = { [Op.like]: `%${query.vehicleNo}%` };
+  if (query.startDate && query.endDate) {
+    where.dateOfAssign = {
+      [Op.between]: [query.startDate, query.endDate],
+    };
+  } else if (query.startDate) {
+    where.dateOfAssign = { [Op.gte]: query.startDate };
+  } else if (query.endDate) {
+    where.dateOfAssign = { [Op.lte]: query.endDate };
+  }
+  if (query.id) where.id = query.id;
+  if (query.fileStatus) where.fileStatus = query.fileStatus;
+  return where;
+}
+
 // Retrieve paginated Casefiles except fileStatus "CANC" or "CLO"
 exports.findPaginatedActive = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.pageSize) || 30;
     const offset = (page - 1) * pageSize;
+    // Combine role-based and filter-based constraints
     let where = {
       fileStatus: { [Op.notIn]: ["CANC", "CLO"] },
       ...buildUserWhere(req.query),
+      ...buildFilters(req.query),
     };
 
     const daysDiffExpr = db.Sequelize.literal(`DATEDIFF(NOW(), dateOfAssign)`);
@@ -494,9 +499,11 @@ exports.findPaginatedClosed = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.pageSize) || 30;
     const offset = (page - 1) * pageSize;
+    // Combine role-based and filter-based constraints
     let where = {
       fileStatus: { [Op.in]: ["CANC", "CLO"] },
       ...buildUserWhere(req.query),
+      ...buildFilters(req.query),
     };
 
     const daysDiffExpr = db.Sequelize.literal(`DATEDIFF(NOW(), dateOfAssign)`);
