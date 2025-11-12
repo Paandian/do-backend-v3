@@ -1,0 +1,2 @@
+(window["webpackJsonp"]=window["webpackJsonp"]||[]).push([["chunk-2d218069"],{c8db:function(n,e,t){"use strict";t.r(e);var s=t("0798"),o=t("b0af"),a=function(){var n=this,e=n._self._c;return e(o["a"],{staticClass:"pa-4"},[e("h2",[n._v("Closed by Adjuster (By Month)")]),e(s["a"],{attrs:{type:"info",outlined:""}},[n._v(" 🚧 This feature is under development. Coming soon! 🚧 ")])],1)},u=[],l={name:"ClosedByAdjusterMonth"},d=l,i=t("2877"),r=Object(i["a"])(d,a,u,!1,null,null,null);e["default"]=r.exports}}]);
+//# sourceMappingURL=chunk-2d218069.e1faec5f.js.map

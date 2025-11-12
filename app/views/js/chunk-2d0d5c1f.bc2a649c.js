@@ -1,0 +1,2 @@
+(window["webpackJsonp"]=window["webpackJsonp"]||[]).push([["chunk-2d0d5c1f"],{"703c":function(n,a,e){"use strict";e.r(a);var t=e("0798"),o=e("b0af"),i=function(){var n=this,a=n._self._c;return a(o["a"],{staticClass:"pa-4"},[a("h2",[n._v("Compliance Ratio (By Branch)")]),a(t["a"],{attrs:{type:"info",outlined:""}},[n._v(" 🚧 This feature is under development. Coming soon! 🚧 ")])],1)},c=[],s={name:"ComplianceRatioBranch"},l=s,u=e("2877"),r=Object(u["a"])(l,i,c,!1,null,null,null);a["default"]=r.exports}}]);
+//# sourceMappingURL=chunk-2d0d5c1f.bc2a649c.js.map

@@ -21,23 +21,6 @@ const CORS_ORIGIN = isProd
 const app = express();
 global.__basedir = __dirname;
 
-// Production-only middleware
-if (isProd) {
-  const staticPath = path.join(
-    __dirname,
-    process.env.STATIC_PATH || "app/views"
-  );
-  const uploadsPath = path.join(
-    __dirname,
-    process.env.UPLOADS_PATH || "../uploads"
-  );
-
-  app.use(history());
-  app.use(express.static(staticPath));
-  app.use(express.static(uploadsPath));
-  console.log("Production mode: Static paths configured");
-}
-
 // CORS Configuration
 const corsOptions = {
   origin: CORS_ORIGIN,
@@ -124,6 +107,23 @@ app.get("/", (req, res) => {
 ].forEach((route) => {
   require(`./app/routes/${route}.routes`)(app);
 });
+
+// Production-only middleware (move AFTER API routes)
+if (isProd) {
+  const staticPath = path.join(
+    __dirname,
+    process.env.STATIC_PATH || "app/views"
+  );
+  const uploadsPath = path.join(
+    __dirname,
+    process.env.UPLOADS_PATH || "../uploads"
+  );
+
+  app.use(history());
+  app.use(express.static(staticPath));
+  app.use(express.static(uploadsPath));
+  console.log("Production mode: Static paths configured");
+}
 
 // Error handling middleware
 app.use((err, req, res, next) => {

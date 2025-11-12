@@ -1,0 +1,2 @@
+(window["webpackJsonp"]=window["webpackJsonp"]||[]).push([["chunk-2d225c40"],{e692:function(e,n,a){"use strict";a.r(n);var t=a("0798"),s=a("b0af"),o=function(){var e=this,n=e._self._c;return n(s["a"],{staticClass:"pa-4"},[n("h2",[e._v("Ratio Calculator by Closed Files (Insurer)")]),n(t["a"],{attrs:{type:"info",outlined:""}},[e._v(" 🚧 This feature is under development. Coming soon! 🚧 ")])],1)},l=[],u={name:"RatioCalculatorInsurer"},r=u,i=a("2877"),c=Object(i["a"])(r,o,l,!1,null,null,null);n["default"]=c.exports}}]);
+//# sourceMappingURL=chunk-2d225c40.01984d8e.js.map

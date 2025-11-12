@@ -1,0 +1,2 @@
+(window["webpackJsonp"]=window["webpackJsonp"]||[]).push([["chunk-2d0c13b6"],{"44bb":function(n,t,a){"use strict";a.r(t);var s=a("0798"),e=a("b0af"),i=function(){var n=this,t=n._self._c;return t(e["a"],{staticClass:"pa-4"},[t("h2",[n._v("Outstanding Assignment by Days (Branch)")]),t(s["a"],{attrs:{type:"info",outlined:""}},[n._v(" 🚧 This feature is under development. Coming soon! 🚧 ")])],1)},u=[],o={name:"OutstandingDaysBranch"},c=o,r=a("2877"),l=Object(r["a"])(c,i,u,!1,null,null,null);t["default"]=l.exports}}]);
+//# sourceMappingURL=chunk-2d0c13b6.ecc12c26.js.map
