@@ -104,6 +104,7 @@ app.get("/", (req, res) => {
   "merimenData",
   "sftp",
   "sftpFile",
+  "compliance",
 ].forEach((route) => {
   require(`./app/routes/${route}.routes`)(app);
 });
