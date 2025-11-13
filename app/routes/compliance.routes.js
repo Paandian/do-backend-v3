@@ -13,5 +13,9 @@ module.exports = (app) => {
   router.get("/ratio-insurer", compliance.getComplianceRatioInsurer);
   router.get("/ratio-insurer/export", compliance.exportComplianceRatioInsurer);
 
+  // Compliance: Ratio By Branch
+  router.get("/ratio-branch", compliance.getComplianceRatioBranch);
+  router.get("/ratio-branch/export", compliance.exportComplianceRatioBranch);
+
   app.use("/api/compliance", router);
 };
