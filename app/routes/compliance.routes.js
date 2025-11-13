@@ -24,5 +24,9 @@ module.exports = (app) => {
     compliance.exportOutstandingInsurer
   );
 
+  // Outstanding Assignment (By Branch)
+  router.get("/outstanding-branch", compliance.getOutstandingBranch);
+  router.get("/outstanding-branch/export", compliance.exportOutstandingBranch);
+
   app.use("/api/compliance", router);
 };
