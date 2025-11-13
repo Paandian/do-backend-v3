@@ -58,6 +58,13 @@ module.exports = (app) => {
     casefiles.exportClosedFilesComplianceReport
   );
 
+  // Compliance: Ratio By Insurer
+  router.get("/compliance/ratio-insurer", casefiles.getComplianceRatioInsurer);
+  router.get(
+    "/compliance/ratio-insurer/export",
+    casefiles.exportComplianceRatioInsurer
+  );
+
   // app.use("/api/casefiles", [authJwt.verifyToken], router);
   app.use("/api/casefiles", router);
 };
