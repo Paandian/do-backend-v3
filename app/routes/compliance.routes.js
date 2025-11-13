@@ -17,5 +17,12 @@ module.exports = (app) => {
   router.get("/ratio-branch", compliance.getComplianceRatioBranch);
   router.get("/ratio-branch/export", compliance.exportComplianceRatioBranch);
 
+  // Outstanding Assignment (By Insurer)
+  router.get("/outstanding-insurer", compliance.getOutstandingInsurer);
+  router.get(
+    "/outstanding-insurer/export",
+    compliance.exportOutstandingInsurer
+  );
+
   app.use("/api/compliance", router);
 };
