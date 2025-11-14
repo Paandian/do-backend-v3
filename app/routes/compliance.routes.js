@@ -42,5 +42,11 @@ module.exports = (app) => {
     compliance.exportOutstandingDaysBranch
   );
 
+  // Ratio Calculator by Closed Files (Insurer)
+  router.get(
+    "/ratio-calculator-insurer/export",
+    compliance.exportRatioCalculatorInsurer
+  );
+
   app.use("/api/compliance", router);
 };
