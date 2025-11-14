@@ -28,5 +28,12 @@ module.exports = (app) => {
   router.get("/outstanding-branch", compliance.getOutstandingBranch);
   router.get("/outstanding-branch/export", compliance.exportOutstandingBranch);
 
+  // Outstanding Assignment by Days (Insurer)
+  router.get("/outstanding-days-insurer", compliance.getOutstandingDaysInsurer);
+  router.get(
+    "/outstanding-days-insurer/export",
+    compliance.exportOutstandingDaysInsurer
+  );
+
   app.use("/api/compliance", router);
 };
