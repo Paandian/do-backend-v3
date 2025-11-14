@@ -891,7 +891,6 @@ exports.exportComplianceRatioBranch = async (req, res) => {
     const { month } = req.query;
     if (!month) return res.status(400).json({ message: "Month is required" });
 
-    // Reuse logic from getComplianceRatioBranch
     const startDate = `${month}-01`;
     const endDate = `${month}-31`;
 
@@ -1561,83 +1560,75 @@ exports.getOutstandingBranch = async (req, res) => {
       branchMap[String(b.id)] = b.name;
     });
 
-    // Get all TAT charts (for compliance days)
-    const tatCharts = await db.tatchart.findAll();
-    const tatMap = {};
-    tatCharts.forEach((t) => {
-      tatMap[`${String(t.insId)}-${String(t.subDeptId)}`] = t.tatMax;
-    });
+    // Build where clause for outstanding files
+    const where = {
+      fileStatus: { [db.Sequelize.Op.notIn]: ["CLO", "CLOSED", "CANC"] },
+      dateOfAssign: { [db.Sequelize.Op.lte]: endDate },
+    };
 
     // Get all outstanding (not closed) files assigned at any time, not closed as of end of month
     const files = await db.casefiles.findAll({
-      where: {
-        fileStatus: { [db.Sequelize.Op.notIn]: ["CLO", "CLOSED", "CANC"] },
-        dateOfAssign: { [db.Sequelize.Op.lte]: endDate },
-      },
-      attributes: ["branch", "insurer", "subRefType", "dateOfAssign", "id"],
+      where,
+      attributes: ["branch", "dateOfAssign", "id"],
     });
 
-    const result = {};
+    const buckets = {};
     files.forEach((file) => {
-      if (
-        file.branch === null ||
-        file.branch === undefined ||
-        file.subRefType === null ||
-        file.subRefType === undefined ||
-        file.insurer === null ||
-        file.insurer === undefined ||
-        file.branch === "" ||
-        file.subRefType === "" ||
-        file.insurer === ""
-      ) {
-        return;
+      const branchName = branchMap[file.branch] || "Unknown";
+      if (!buckets[branchName]) {
+        buckets[branchName] = {
+          below30: 0,
+          above30: 0,
+          above45: 0,
+          above60: 0,
+          above90: 0,
+          total: 0,
+        };
       }
-      const branchId = String(file.branch);
-      const subRefTypeId = String(file.subRefType);
-      const insurerId = String(file.insurer);
-      if (!result[branchId]) {
-        result[branchId] = { withinTat: 0, breachedTat: 0, total: 0 };
-      }
-      const tatKey = `${insurerId}-${subRefTypeId}`;
-      const tatDays = tatMap.hasOwnProperty(tatKey) ? tatMap[tatKey] : null;
       let days = 0;
       if (file.dateOfAssign) {
         days = Math.abs(
           Math.floor(
-            (new Date(`${month}-31`) - new Date(file.dateOfAssign)) /
+            (new Date(endDate) - new Date(file.dateOfAssign)) /
               (1000 * 60 * 60 * 24)
           )
         );
       }
-      if (
-        tatDays === null ||
-        typeof tatDays === "undefined" ||
-        days <= tatDays
-      ) {
-        result[branchId].withinTat += 1;
-      } else {
-        result[branchId].breachedTat += 1;
-      }
-      result[branchId].total += 1;
+      if (days < 30) buckets[branchName].below30 += 1;
+      if (days >= 30 && days < 45) buckets[branchName].above30 += 1;
+      if (days >= 45 && days < 60) buckets[branchName].above45 += 1;
+      if (days >= 60 && days < 90) buckets[branchName].above60 += 1;
+      if (days >= 90) buckets[branchName].above90 += 1;
+      buckets[branchName].total += 1;
     });
 
-    const reportData = Object.entries(result)
-      .map(([branchId, counts]) => {
-        const percent =
-          counts.total > 0
-            ? ((counts.withinTat / counts.total) * 100).toFixed(2)
-            : "0.00";
-        return {
-          branch: branchMap[branchId] || "Unknown",
-          withinTat: counts.withinTat,
-          breachedTat: counts.breachedTat,
-          total: counts.total,
-          percent: percent,
-        };
-      })
-      .sort((a, b) => a.branch.localeCompare(b.branch));
+    const reportData = Object.entries(buckets).map(([branch, counts]) => ({
+      branch,
+      ...counts,
+    }));
 
-    res.json({ reportData });
+    // Sort branches alphabetically
+    reportData.sort((a, b) => a.branch.localeCompare(b.branch));
+
+    // Totals
+    const totals = {
+      below30: 0,
+      above30: 0,
+      above45: 0,
+      above60: 0,
+      above90: 0,
+      total: 0,
+    };
+    reportData.forEach((row) => {
+      totals.below30 += row.below30;
+      totals.above30 += row.above30;
+      totals.above45 += row.above45;
+      totals.above60 += row.above60;
+      totals.above90 += row.above90;
+      totals.total += row.total;
+    });
+
+    res.json({ reportData, totals });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -1651,137 +1642,133 @@ exports.exportOutstandingBranch = async (req, res) => {
 
     const endDate = `${month}-31`;
 
+    // Get department name for title
+    let deptName = "TPBI";
+    if (deptId === "all" || deptId === "" || deptId === null) {
+      deptName = "ALL DEPARTMENTS";
+    } else if (deptId) {
+      const dept = await db.dept.findByPk(deptId);
+      if (dept && dept.name) deptName = dept.name;
+    }
+
     const branches = await db.branch.findAll({ attributes: ["id", "name"] });
     const branchMap = {};
     branches.forEach((b) => {
       branchMap[String(b.id)] = b.name;
     });
 
-    const tatCharts = await db.tatchart.findAll();
-    const tatMap = {};
-    tatCharts.forEach((t) => {
-      tatMap[`${String(t.insId)}-${String(t.subDeptId)}`] = t.tatMax;
-    });
+    const where = {
+      fileStatus: { [db.Sequelize.Op.notIn]: ["CLO", "CLOSED", "CANC"] },
+      dateOfAssign: { [db.Sequelize.Op.lte]: endDate },
+    };
 
     const files = await db.casefiles.findAll({
-      where: {
-        fileStatus: { [db.Sequelize.Op.notIn]: ["CLO", "CLOSED", "CANC"] },
-        dateOfAssign: { [db.Sequelize.Op.lte]: endDate },
-      },
-      attributes: ["branch", "insurer", "subRefType", "dateOfAssign", "id"],
+      where,
+      attributes: ["branch", "dateOfAssign", "id"],
     });
 
-    const result = {};
+    const buckets = {};
     files.forEach((file) => {
-      if (
-        file.branch === null ||
-        file.branch === undefined ||
-        file.subRefType === null ||
-        file.subRefType === undefined ||
-        file.insurer === null ||
-        file.insurer === undefined ||
-        file.branch === "" ||
-        file.subRefType === "" ||
-        file.insurer === ""
-      ) {
-        return;
+      const branchName = branchMap[file.branch] || "Unknown";
+      if (!buckets[branchName]) {
+        buckets[branchName] = {
+          below30: 0,
+          above30: 0,
+          above45: 0,
+          above60: 0,
+          above90: 0,
+          total: 0,
+        };
       }
-      const branchId = String(file.branch);
-      const subRefTypeId = String(file.subRefType);
-      const insurerId = String(file.insurer);
-      if (!result[branchId]) {
-        result[branchId] = { withinTat: 0, breachedTat: 0, total: 0 };
-      }
-      const tatKey = `${insurerId}-${subRefTypeId}`;
-      const tatDays = tatMap.hasOwnProperty(tatKey) ? tatMap[tatKey] : null;
       let days = 0;
       if (file.dateOfAssign) {
         days = Math.abs(
           Math.floor(
-            (new Date(`${month}-31`) - new Date(file.dateOfAssign)) /
+            (new Date(endDate) - new Date(file.dateOfAssign)) /
               (1000 * 60 * 60 * 24)
           )
         );
       }
-      if (
-        tatDays === null ||
-        typeof tatDays === "undefined" ||
-        days <= tatDays
-      ) {
-        result[branchId].withinTat += 1;
-      } else {
-        result[branchId].breachedTat += 1;
-      }
-      result[branchId].total += 1;
+      if (days < 30) buckets[branchName].below30 += 1;
+      if (days >= 30 && days < 45) buckets[branchName].above30 += 1;
+      if (days >= 45 && days < 60) buckets[branchName].above45 += 1;
+      if (days >= 60 && days < 90) buckets[branchName].above60 += 1;
+      if (days >= 90) buckets[branchName].above90 += 1;
+      buckets[branchName].total += 1;
     });
 
-    const reportData = Object.entries(result)
-      .map(([branchId, counts]) => {
-        const percent =
-          counts.total > 0
-            ? ((counts.withinTat / counts.total) * 100).toFixed(2)
-            : "0.00";
-        return {
-          branch: branchMap[branchId] || "Unknown",
-          withinTat: counts.withinTat,
-          breachedTat: counts.breachedTat,
-          total: counts.total,
-          percent: percent,
-        };
-      })
-      .sort((a, b) => a.branch.localeCompare(b.branch));
+    const reportData = Object.entries(buckets).map(([branch, counts]) => ({
+      branch,
+      ...counts,
+    }));
+
+    // Sort branches alphabetically
+    reportData.sort((a, b) => a.branch.localeCompare(b.branch));
+
+    // Totals
+    const totals = {
+      below30: 0,
+      above30: 0,
+      above45: 0,
+      above60: 0,
+      above90: 0,
+      total: 0,
+    };
+    reportData.forEach((row) => {
+      totals.below30 += row.below30;
+      totals.above30 += row.above30;
+      totals.above45 += row.above45;
+      totals.above60 += row.above60;
+      totals.above90 += row.above90;
+      totals.total += row.total;
+    });
 
     // Excel generation
-    const ExcelJS = require("exceljs");
     const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet("Outstanding (Branch)");
+    const sheet = workbook.addWorksheet("Outstanding By Days (Branch)");
 
-    // --- Table Title ---
+    // --- Title row ---
     const monthObj = new Date(`${month}-31`);
     const monthName = monthObj
       .toLocaleString("default", { month: "long" })
       .toUpperCase();
     const year = monthObj.getFullYear();
-    const titleText = `OUTSTANDING ASSIGNMENT SUMMARY ${monthName} ${year} - BY BRANCH`;
+    const titleText = `${deptName.toUpperCase()} OUTSTANDING BY DAYS - BRANCH - AS OF ${monthObj.getDate()} ${monthName} ${year}`;
     sheet.addRow([titleText]);
-    sheet.mergeCells("A1:E1");
+    sheet.mergeCells("A1:G1");
     const titleRow = sheet.getRow(1);
-    titleRow.height = 41.25;
-    titleRow.getCell(1).font = { name: "Tahoma", size: 12, bold: true };
+    titleRow.height = 32;
+    titleRow.getCell(1).font = { name: "Calibri", size: 12, bold: true };
     titleRow.getCell(1).alignment = {
       vertical: "middle",
       horizontal: "center",
     };
-    titleRow.getCell(1).fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FF92D050" },
-    };
-    titleRow.getCell(1).value = titleText.toUpperCase();
 
     // --- Header row ---
     const headerValues = [
       "BRANCH",
-      "OUTSTANDING (WITHIN TAT)",
-      "OUTSTANDING (BREACHED TAT)",
-      "TOTAL OUTSTANDING",
-      "WITHIN TAT (%)",
+      "OUTSTANDING BELOW 30 DAYS",
+      "OUTSTANDING ABOVE 30 DAYS",
+      "OUTSTANDING ABOVE 45 DAYS",
+      "OUTSTANDING ABOVE 60 DAYS",
+      "OUTSTANDING ABOVE 90 DAYS",
+      `TOTAL AS AT ${monthObj.toLocaleDateString("en-GB")}`,
     ];
     sheet.addRow(headerValues);
     const headerRow = sheet.getRow(2);
-    headerRow.height = 20;
+    headerRow.height = 22;
     headerRow.eachCell((cell) => {
       cell.font = {
-        name: "Tahoma",
+        name: "Calibri",
         size: 11,
         bold: true,
-        color: { argb: "FF000000" },
+        color: { argb: "FFFFFFFF" },
       };
       cell.alignment = { vertical: "middle", horizontal: "center" };
       cell.fill = {
         type: "pattern",
         pattern: "solid",
-        fgColor: { argb: "FFEDEDED" },
+        fgColor: { argb: "FF002060" },
       };
       cell.border = {
         top: { style: "thin" },
@@ -1794,34 +1781,23 @@ exports.exportOutstandingBranch = async (req, res) => {
 
     // --- Data rows ---
     let rowIdx = 3;
-    let totalWithinTat = 0,
-      totalBreachedTat = 0,
-      totalFiles = 0;
     reportData.forEach((row) => {
-      totalWithinTat += row.withinTat;
-      totalBreachedTat += row.breachedTat;
-      totalFiles += row.total;
       const values = [
-        String(row.branch).toUpperCase(),
-        row.withinTat,
-        row.breachedTat,
+        row.branch.toUpperCase(),
+        row.below30,
+        row.above30,
+        row.above45,
+        row.above60,
+        row.above90,
         row.total,
-        row.percent,
       ];
       sheet.addRow(values);
       const dataRow = sheet.getRow(rowIdx);
       dataRow.height = 18;
-      dataRow.getCell(1).font = { name: "Tahoma", size: 11, bold: false }; // Insurer name not bold
-      for (let col = 2; col <= 5; col++) {
-        dataRow.getCell(col).font = { name: "Tahoma", size: 11, bold: true };
+      dataRow.getCell(1).font = { name: "Calibri", size: 11, bold: true };
+      for (let col = 2; col <= 7; col++) {
+        dataRow.getCell(col).font = { name: "Calibri", size: 11, bold: false };
       }
-      // Not Complied column (3rd col): red text
-      dataRow.getCell(3).font = {
-        name: "Tahoma",
-        size: 11,
-        bold: true,
-        color: { argb: "FFFF0000" },
-      };
       dataRow.eachCell((cell, colNumber) => {
         cell.alignment = { vertical: "middle", horizontal: "center" };
         cell.border = {
@@ -1830,39 +1806,35 @@ exports.exportOutstandingBranch = async (req, res) => {
           bottom: { style: "thin" },
           right: { style: "thin" },
         };
-        if (colNumber === 1) {
-          cell.value = String(cell.value).toUpperCase();
-        }
       });
       rowIdx++;
     });
 
-    // Totals row
-    const overallPercent =
-      totalFiles > 0
-        ? ((totalWithinTat / totalFiles) * 100).toFixed(2)
-        : "0.00";
+    // --- Total row ---
     sheet.addRow([
       "TOTAL",
-      totalWithinTat,
-      totalBreachedTat,
-      totalFiles,
-      overallPercent,
+      totals.below30,
+      totals.above30,
+      totals.above45,
+      totals.above60,
+      totals.above90,
+      totals.total,
     ]);
     const totalRow = sheet.getRow(rowIdx);
     totalRow.height = 18;
-    totalRow.getCell(1).font = { name: "Tahoma", size: 11, bold: true };
-    totalRow.getCell(2).font = { name: "Tahoma", size: 11, bold: true };
-    totalRow.getCell(3).font = {
-      name: "Tahoma",
-      size: 11,
-      bold: true,
-      color: { argb: "FFFF0000" },
-    };
-    totalRow.getCell(4).font = { name: "Tahoma", size: 11, bold: true };
-    totalRow.getCell(5).font = { name: "Tahoma", size: 11, bold: true };
     totalRow.eachCell((cell, colNumber) => {
+      cell.font = {
+        name: "Calibri",
+        size: 11,
+        bold: true,
+        color: { argb: "FFFFFFFF" },
+      };
       cell.alignment = { vertical: "middle", horizontal: "center" };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF002060" },
+      };
       cell.border = {
         top: { style: "thin" },
         left: { style: "thin" },
@@ -1872,40 +1844,34 @@ exports.exportOutstandingBranch = async (req, res) => {
       cell.value = String(cell.value).toUpperCase();
     });
 
-    // OVERALL RATIO row
-    sheet.addRow(["WITHIN TAT RATIO", "", "", "", overallPercent]);
-    const overallRow = sheet.getRow(rowIdx + 1);
-    overallRow.height = 39.75;
-    // Merge first four columns
-    sheet.mergeCells(`A${rowIdx + 1}:D${rowIdx + 1}`);
-    // Style merged cell for "OVERALL RATIO"
-    overallRow.getCell(1).font = { name: "Tahoma", size: 18, bold: true };
-    overallRow.getCell(1).alignment = {
+    // --- "NEW FILES" row ---
+    sheet.addRow(["", "", "", "", "NEW FILES", "", ""]);
+    const newFilesRow = sheet.getRow(rowIdx + 1);
+    newFilesRow.height = 18;
+    newFilesRow.getCell(5).font = { name: "Calibri", size: 11, bold: true };
+    newFilesRow.getCell(5).alignment = {
       vertical: "middle",
       horizontal: "center",
     };
-    overallRow.getCell(1).fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FFEDEDED" },
-    };
-    overallRow.getCell(1).value = "WITHIN TAT RATIO";
-    // Style the cell for the overall percent (column E)
-    overallRow.getCell(5).font = { name: "Tahoma", size: 18, bold: true };
-    overallRow.getCell(5).alignment = {
-      vertical: "middle",
-      horizontal: "center",
-    };
-    overallRow.getCell(5).fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FFEDEDED" },
-    };
-    overallRow.getCell(5).value = overallPercent;
 
-    // Set column widths
+    // --- "GRAND TOTAL" row ---
+    sheet.addRow(["", "", "", "", "GRAND TOTAL", "", totals.total]);
+    const grandTotalRow = sheet.getRow(rowIdx + 2);
+    grandTotalRow.height = 18;
+    grandTotalRow.getCell(5).font = { name: "Calibri", size: 11, bold: true };
+    grandTotalRow.getCell(5).alignment = {
+      vertical: "middle",
+      horizontal: "center",
+    };
+    grandTotalRow.getCell(7).font = { name: "Calibri", size: 11, bold: true };
+    grandTotalRow.getCell(7).alignment = {
+      vertical: "middle",
+      horizontal: "center",
+    };
+
+    // --- Set column widths ---
     sheet.getColumn(1).width = 28;
-    for (let i = 2; i <= 5; i++) {
+    for (let i = 2; i <= 7; i++) {
       sheet.getColumn(i).width = 18;
     }
 
@@ -1915,7 +1881,7 @@ exports.exportOutstandingBranch = async (req, res) => {
     );
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename=Outstanding_Branch_${month}.xlsx`
+      `attachment; filename=OutstandingDays_Branch_${month}.xlsx`
     );
     await workbook.xlsx.write(res);
     res.end();
@@ -2264,6 +2230,353 @@ exports.exportOutstandingDaysInsurer = async (req, res) => {
     res.setHeader(
       "Content-Disposition",
       `attachment; filename=OutstandingDays_Insurer_${month}.xlsx`
+    );
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Outstanding Assignment by Days (Branch) - API
+exports.getOutstandingDaysBranch = async (req, res) => {
+  try {
+    const { month, deptId } = req.query;
+    if (!month) return res.status(400).json({ message: "Month is required" });
+
+    const endDate = `${month}-31`;
+
+    // Get all branches
+    const branches = await db.branch.findAll({ attributes: ["id", "name"] });
+    const branchMap = {};
+    branches.forEach((b) => {
+      branchMap[String(b.id)] = b.name;
+    });
+
+    // Build where clause for outstanding files
+    const where = {
+      fileStatus: { [db.Sequelize.Op.notIn]: ["CLO", "CLOSED", "CANC"] },
+      dateOfAssign: { [db.Sequelize.Op.lte]: endDate },
+      ...(deptId && deptId !== "all" && { refType: deptId }),
+    };
+
+    // Get all outstanding (not closed) files assigned at any time, not closed as of end of month
+    const files = await db.casefiles.findAll({
+      where,
+      attributes: ["branch", "dateOfAssign", "id"],
+    });
+
+    const buckets = {};
+    files.forEach((file) => {
+      const branchName = branchMap[file.branch] || "Unknown";
+      if (!buckets[branchName]) {
+        buckets[branchName] = {
+          below30: 0,
+          above30: 0,
+          above45: 0,
+          above60: 0,
+          above90: 0,
+          total: 0,
+        };
+      }
+      let days = 0;
+      if (file.dateOfAssign) {
+        days = Math.abs(
+          Math.floor(
+            (new Date(endDate) - new Date(file.dateOfAssign)) /
+              (1000 * 60 * 60 * 24)
+          )
+        );
+      }
+      if (days < 30) buckets[branchName].below30 += 1;
+      if (days >= 30 && days < 45) buckets[branchName].above30 += 1;
+      if (days >= 45 && days < 60) buckets[branchName].above45 += 1;
+      if (days >= 60 && days < 90) buckets[branchName].above60 += 1;
+      if (days >= 90) buckets[branchName].above90 += 1;
+      buckets[branchName].total += 1;
+    });
+
+    const reportData = Object.entries(buckets).map(([branch, counts]) => ({
+      branch,
+      ...counts,
+    }));
+
+    // Sort branches alphabetically
+    reportData.sort((a, b) => a.branch.localeCompare(b.branch));
+
+    // Totals
+    const totals = {
+      below30: 0,
+      above30: 0,
+      above45: 0,
+      above60: 0,
+      above90: 0,
+      total: 0,
+    };
+    reportData.forEach((row) => {
+      totals.below30 += row.below30;
+      totals.above30 += row.above30;
+      totals.above45 += row.above45;
+      totals.above60 += row.above60;
+      totals.above90 += row.above90;
+      totals.total += row.total;
+    });
+
+    res.json({ reportData, totals });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Outstanding Assignment by Days (Branch) - Excel Export
+exports.exportOutstandingDaysBranch = async (req, res) => {
+  try {
+    const { month, deptId } = req.query;
+    if (!month) return res.status(400).json({ message: "Month is required" });
+
+    const endDate = `${month}-31`;
+
+    // Get department name for title
+    let deptName = "TPBI";
+    if (deptId === "all" || deptId === "" || deptId === null) {
+      deptName = "ALL DEPARTMENTS";
+    } else if (deptId) {
+      const dept = await db.dept.findByPk(deptId);
+      if (dept && dept.name) deptName = dept.name;
+    }
+
+    const branches = await db.branch.findAll({ attributes: ["id", "name"] });
+    const branchMap = {};
+    branches.forEach((b) => {
+      branchMap[String(b.id)] = b.name;
+    });
+
+    const where = {
+      fileStatus: { [db.Sequelize.Op.notIn]: ["CLO", "CLOSED", "CANC"] },
+      dateOfAssign: { [db.Sequelize.Op.lte]: endDate },
+      ...(deptId && deptId !== "all" && { refType: deptId }),
+    };
+
+    const files = await db.casefiles.findAll({
+      where,
+      attributes: ["branch", "dateOfAssign", "id"],
+    });
+
+    const buckets = {};
+    files.forEach((file) => {
+      const branchName = branchMap[file.branch] || "Unknown";
+      if (!buckets[branchName]) {
+        buckets[branchName] = {
+          below30: 0,
+          above30: 0,
+          above45: 0,
+          above60: 0,
+          above90: 0,
+          total: 0,
+        };
+      }
+      let days = 0;
+      if (file.dateOfAssign) {
+        days = Math.abs(
+          Math.floor(
+            (new Date(endDate) - new Date(file.dateOfAssign)) /
+              (1000 * 60 * 60 * 24)
+          )
+        );
+      }
+      if (days < 30) buckets[branchName].below30 += 1;
+      if (days >= 30 && days < 45) buckets[branchName].above30 += 1;
+      if (days >= 45 && days < 60) buckets[branchName].above45 += 1;
+      if (days >= 60 && days < 90) buckets[branchName].above60 += 1;
+      if (days >= 90) buckets[branchName].above90 += 1;
+      buckets[branchName].total += 1;
+    });
+
+    const reportData = Object.entries(buckets).map(([branch, counts]) => ({
+      branch,
+      ...counts,
+    }));
+
+    // Sort branches alphabetically
+    reportData.sort((a, b) => a.branch.localeCompare(b.branch));
+
+    // Totals
+    const totals = {
+      below30: 0,
+      above30: 0,
+      above45: 0,
+      above60: 0,
+      above90: 0,
+      total: 0,
+    };
+    reportData.forEach((row) => {
+      totals.below30 += row.below30;
+      totals.above30 += row.above30;
+      totals.above45 += row.above45;
+      totals.above60 += row.above60;
+      totals.above90 += row.above90;
+      totals.total += row.total;
+    });
+
+    // Excel generation
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Outstanding By Days (Branch)");
+
+    // --- Title row ---
+    const monthObj = new Date(`${month}-31`);
+    const monthName = monthObj
+      .toLocaleString("default", { month: "long" })
+      .toUpperCase();
+    const year = monthObj.getFullYear();
+    const titleText = `${deptName.toUpperCase()} OUTSTANDING BY DAYS - BRANCH - AS OF ${monthObj.getDate()} ${monthName} ${year}`;
+    sheet.addRow([titleText]);
+    sheet.mergeCells("A1:G1");
+    const titleRow = sheet.getRow(1);
+    titleRow.height = 32;
+    titleRow.getCell(1).font = { name: "Calibri", size: 12, bold: true };
+    titleRow.getCell(1).alignment = {
+      vertical: "middle",
+      horizontal: "center",
+    };
+
+    // --- Header row ---
+    const headerValues = [
+      "BRANCH",
+      "OUTSTANDING BELOW 30 DAYS",
+      "OUTSTANDING ABOVE 30 DAYS",
+      "OUTSTANDING ABOVE 45 DAYS",
+      "OUTSTANDING ABOVE 60 DAYS",
+      "OUTSTANDING ABOVE 90 DAYS",
+      `TOTAL AS AT ${monthObj.toLocaleDateString("en-GB")}`,
+    ];
+    sheet.addRow(headerValues);
+    const headerRow = sheet.getRow(2);
+    headerRow.height = 22;
+    headerRow.eachCell((cell) => {
+      cell.font = {
+        name: "Calibri",
+        size: 11,
+        bold: true,
+        color: { argb: "FFFFFFFF" },
+      };
+      cell.alignment = { vertical: "middle", horizontal: "center" };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF002060" },
+      };
+      cell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+      cell.value = String(cell.value).toUpperCase();
+    });
+
+    // --- Data rows ---
+    let rowIdx = 3;
+    reportData.forEach((row) => {
+      const values = [
+        row.branch.toUpperCase(),
+        row.below30,
+        row.above30,
+        row.above45,
+        row.above60,
+        row.above90,
+        row.total,
+      ];
+      sheet.addRow(values);
+      const dataRow = sheet.getRow(rowIdx);
+      dataRow.height = 18;
+      dataRow.getCell(1).font = { name: "Calibri", size: 11, bold: true };
+      for (let col = 2; col <= 7; col++) {
+        dataRow.getCell(col).font = { name: "Calibri", size: 11, bold: false };
+      }
+      dataRow.eachCell((cell, colNumber) => {
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+        cell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+      });
+      rowIdx++;
+    });
+
+    // --- Total row ---
+    sheet.addRow([
+      "TOTAL",
+      totals.below30,
+      totals.above30,
+      totals.above45,
+      totals.above60,
+      totals.above90,
+      totals.total,
+    ]);
+    const totalRow = sheet.getRow(rowIdx);
+    totalRow.height = 18;
+    totalRow.eachCell((cell, colNumber) => {
+      cell.font = {
+        name: "Calibri",
+        size: 11,
+        bold: true,
+        color: { argb: "FFFFFFFF" },
+      };
+      cell.alignment = { vertical: "middle", horizontal: "center" };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF002060" },
+      };
+      cell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+      cell.value = String(cell.value).toUpperCase();
+    });
+
+    // --- "NEW FILES" row ---
+    sheet.addRow(["", "", "", "", "NEW FILES", "", ""]);
+    const newFilesRow = sheet.getRow(rowIdx + 1);
+    newFilesRow.height = 18;
+    newFilesRow.getCell(5).font = { name: "Calibri", size: 11, bold: true };
+    newFilesRow.getCell(5).alignment = {
+      vertical: "middle",
+      horizontal: "center",
+    };
+
+    // --- "GRAND TOTAL" row ---
+    sheet.addRow(["", "", "", "", "GRAND TOTAL", "", totals.total]);
+    const grandTotalRow = sheet.getRow(rowIdx + 2);
+    grandTotalRow.height = 18;
+    grandTotalRow.getCell(5).font = { name: "Calibri", size: 11, bold: true };
+    grandTotalRow.getCell(5).alignment = {
+      vertical: "middle",
+      horizontal: "center",
+    };
+    grandTotalRow.getCell(7).font = { name: "Calibri", size: 11, bold: true };
+    grandTotalRow.getCell(7).alignment = {
+      vertical: "middle",
+      horizontal: "center",
+    };
+
+    // --- Set column widths ---
+    sheet.getColumn(1).width = 28;
+    for (let i = 2; i <= 7; i++) {
+      sheet.getColumn(i).width = 18;
+    }
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=OutstandingDays_Branch_${month}.xlsx`
     );
     await workbook.xlsx.write(res);
     res.end();
