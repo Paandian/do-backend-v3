@@ -8,6 +8,7 @@ module.exports = (app) => {
   const outstandingDaysInsurer = require("../controllers/compliance/outstandingDaysInsurer.controller");
   const outstandingDaysBranch = require("../controllers/compliance/outstandingDaysBranch.controller");
   const ratioCalculatorInsurer = require("../controllers/compliance/ratioCalculatorInsurer.controller");
+  const complianceTable = require("../controllers/compliance/complianceTable.controller");
 
   // Compliance: Closed Files by Department
   router.get("/closed-files", closedFiles.getClosedFilesComplianceReport);
@@ -72,6 +73,9 @@ module.exports = (app) => {
     "/ratio-calculator-insurer/export",
     ratioCalculatorInsurer.exportRatioCalculatorInsurer
   );
+
+  // Compliance Table (Full Assignment Ratio)
+  router.get("/compliance-table/export", complianceTable.exportComplianceTable);
 
   app.use("/api/compliance", router);
 };
