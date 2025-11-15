@@ -199,10 +199,15 @@ exports.exportOutstandingBranch = async (req, res) => {
     const year = monthObj.getFullYear();
     const titleText = `OUTSTANDING ASSIGNMENT SUMMARY ${monthName} ${year} - BY BRANCH`;
     sheet.addRow([titleText]);
-    sheet.mergeCells("A1:E1");
+    sheet.mergeCells("A1:F1");
     const titleRow = sheet.getRow(1);
     titleRow.height = 41.25;
-    titleRow.getCell(1).font = { name: "Tahoma", size: 12, bold: true };
+    titleRow.getCell(1).font = {
+      name: "Tahoma",
+      size: 12,
+      bold: true,
+      color: { argb: "FFFFFFFF" },
+    }; // font color white
     titleRow.getCell(1).alignment = {
       vertical: "middle",
       horizontal: "center",
@@ -210,12 +215,13 @@ exports.exportOutstandingBranch = async (req, res) => {
     titleRow.getCell(1).fill = {
       type: "pattern",
       pattern: "solid",
-      fgColor: { argb: "FF92D050" },
+      fgColor: { argb: "FF76933C" },
     };
     titleRow.getCell(1).value = titleText.toUpperCase();
 
     // --- Header row ---
     const headerValues = [
+      "NO.",
       "BRANCH",
       "WITHIN TAT",
       "TAT BREACH",
@@ -256,7 +262,7 @@ exports.exportOutstandingBranch = async (req, res) => {
     let totalWithinTat = 0,
       totalBreachedTat = 0,
       totalFiles = 0;
-    reportData.forEach((row) => {
+    reportData.forEach((row, i) => {
       totalWithinTat += row.withinTat;
       totalBreachedTat += row.breachedTat;
       totalFiles += row.total;
@@ -265,6 +271,7 @@ exports.exportOutstandingBranch = async (req, res) => {
           ? ((row.breachedTat / row.total) * 100).toFixed(2)
           : "0.00";
       const values = [
+        i + 1,
         String(row.branch).toUpperCase(),
         row.withinTat,
         row.breachedTat,
@@ -274,28 +281,31 @@ exports.exportOutstandingBranch = async (req, res) => {
       sheet.addRow(values);
       const dataRow = sheet.getRow(rowIdx);
       dataRow.height = 18;
-      dataRow.getCell(1).font = { name: "Tahoma", size: 11, bold: false };
-      for (let col = 2; col <= 5; col++) {
+      dataRow.getCell(1).font = { name: "Tahoma", size: 11, bold: false }; // NO. not bold
+      dataRow.getCell(2).font = { name: "Tahoma", size: 11, bold: false }; // Branch name not bold
+      for (let col = 3; col <= 6; col++) {
         dataRow.getCell(col).font = { name: "Tahoma", size: 11, bold: true };
       }
-      // Breached TAT column (3rd col): red text
-      dataRow.getCell(3).font = {
+      // Breached TAT column (4th col): red text
+      dataRow.getCell(4).font = {
         name: "Tahoma",
         size: 11,
         bold: true,
         color: { argb: "FFFF0000" },
       };
       dataRow.eachCell((cell, colNumber) => {
-        cell.alignment = { vertical: "middle", horizontal: "center" };
+        if (colNumber === 2) {
+          cell.alignment = { vertical: "middle", horizontal: "left" }; // Branch column left aligned
+          cell.value = String(cell.value).toUpperCase();
+        } else {
+          cell.alignment = { vertical: "middle", horizontal: "center" };
+        }
         cell.border = {
           top: { style: "thin" },
           left: { style: "thin" },
           bottom: { style: "thin" },
           right: { style: "thin" },
         };
-        if (colNumber === 1) {
-          cell.value = String(cell.value).toUpperCase();
-        }
       });
       rowIdx++;
     });
@@ -307,6 +317,7 @@ exports.exportOutstandingBranch = async (req, res) => {
         : "0.00";
     sheet.addRow([
       "TOTAL",
+      "",
       totalWithinTat,
       totalBreachedTat,
       totalFiles,
@@ -315,15 +326,15 @@ exports.exportOutstandingBranch = async (req, res) => {
     const totalRow = sheet.getRow(rowIdx);
     totalRow.height = 18;
     totalRow.getCell(1).font = { name: "Tahoma", size: 11, bold: true };
-    totalRow.getCell(2).font = { name: "Tahoma", size: 11, bold: true };
-    totalRow.getCell(3).font = {
+    totalRow.getCell(3).font = { name: "Tahoma", size: 11, bold: true };
+    totalRow.getCell(4).font = {
       name: "Tahoma",
       size: 11,
       bold: true,
       color: { argb: "FFFF0000" },
     };
-    totalRow.getCell(4).font = { name: "Tahoma", size: 11, bold: true };
     totalRow.getCell(5).font = { name: "Tahoma", size: 11, bold: true };
+    totalRow.getCell(6).font = { name: "Tahoma", size: 11, bold: true };
     totalRow.eachCell((cell, colNumber) => {
       cell.alignment = { vertical: "middle", horizontal: "center" };
       cell.border = {
@@ -336,10 +347,10 @@ exports.exportOutstandingBranch = async (req, res) => {
     });
 
     // OVERALL RATIO row
-    sheet.addRow(["OVERALL RATIO", "", "", "", overallBreachPercent]);
+    sheet.addRow(["OVERALL RATIO", "", "", "", "", overallBreachPercent]);
     const overallRow = sheet.getRow(rowIdx + 1);
     overallRow.height = 39.75;
-    sheet.mergeCells(`A${rowIdx + 1}:D${rowIdx + 1}`);
+    sheet.mergeCells(`A${rowIdx + 1}:E${rowIdx + 1}`);
     overallRow.getCell(1).font = { name: "Tahoma", size: 18, bold: true };
     overallRow.getCell(1).alignment = {
       vertical: "middle",
@@ -351,21 +362,22 @@ exports.exportOutstandingBranch = async (req, res) => {
       fgColor: { argb: "FFEDEDED" },
     };
     overallRow.getCell(1).value = "OVERALL RATIO";
-    overallRow.getCell(5).font = { name: "Tahoma", size: 18, bold: true };
-    overallRow.getCell(5).alignment = {
+    overallRow.getCell(6).font = { name: "Tahoma", size: 18, bold: true };
+    overallRow.getCell(6).alignment = {
       vertical: "middle",
       horizontal: "center",
     };
-    overallRow.getCell(5).fill = {
+    overallRow.getCell(6).fill = {
       type: "pattern",
       pattern: "solid",
       fgColor: { argb: "FFEDEDED" },
     };
-    overallRow.getCell(5).value = overallBreachPercent;
+    overallRow.getCell(6).value = overallBreachPercent;
 
     // Set column widths
-    sheet.getColumn(1).width = 28;
-    for (let i = 2; i <= 5; i++) {
+    sheet.getColumn(1).width = 6; // NO.
+    sheet.getColumn(2).width = 28; // BRANCH
+    for (let i = 3; i <= 6; i++) {
       sheet.getColumn(i).width = 18;
     }
 

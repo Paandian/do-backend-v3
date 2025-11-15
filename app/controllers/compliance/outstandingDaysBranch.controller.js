@@ -307,21 +307,21 @@ exports.exportOutstandingDaysBranch = async (req, res) => {
     });
 
     // --- "NEW FILES" row ---
-    sheet.addRow(["", "", "", "", "NEW FILES", "", ""]);
+    sheet.addRow(["", "", "", "", "", "NEW FILES", ""]);
     const newFilesRow = sheet.getRow(rowIdx + 1);
     newFilesRow.height = 18;
-    newFilesRow.getCell(5).font = { name: "Calibri", size: 11, bold: true };
-    newFilesRow.getCell(5).alignment = {
+    newFilesRow.getCell(6).font = { name: "Calibri", size: 11, bold: true };
+    newFilesRow.getCell(6).alignment = {
       vertical: "middle",
       horizontal: "center",
     };
 
     // --- "GRAND TOTAL" row ---
-    sheet.addRow(["", "", "", "", "GRAND TOTAL", "", totals.total]);
+    sheet.addRow(["", "", "", "", "", "GRAND TOTAL", totals.total]);
     const grandTotalRow = sheet.getRow(rowIdx + 2);
     grandTotalRow.height = 18;
-    grandTotalRow.getCell(5).font = { name: "Calibri", size: 11, bold: true };
-    grandTotalRow.getCell(5).alignment = {
+    grandTotalRow.getCell(6).font = { name: "Calibri", size: 11, bold: true };
+    grandTotalRow.getCell(6).alignment = {
       vertical: "middle",
       horizontal: "center",
     };
