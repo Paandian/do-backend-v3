@@ -243,7 +243,7 @@ exports.exportClosedFilesComplianceReport = async (req, res) => {
     ];
     sheet.addRow(headerValues);
     const headerRow = sheet.getRow(2);
-    headerRow.height = 20;
+    headerRow.height = 42;
     headerRow.eachCell((cell) => {
       cell.font = {
         name: "Tahoma",
@@ -251,7 +251,11 @@ exports.exportClosedFilesComplianceReport = async (req, res) => {
         bold: true,
         color: { argb: "FFFFFFFF" },
       };
-      cell.alignment = { vertical: "middle", horizontal: "center" };
+      cell.alignment = {
+        vertical: "middle",
+        horizontal: "center",
+        wrapText: true,
+      };
       cell.fill = {
         type: "pattern",
         pattern: "solid",
@@ -1377,10 +1381,10 @@ exports.exportOutstandingInsurer = async (req, res) => {
     // --- Header row ---
     const headerValues = [
       "INSURER",
-      "OUTSTANDING (WITHIN TAT)",
-      "OUTSTANDING (BREACHED TAT)",
-      "TOTAL OUTSTANDING",
-      "WITHIN TAT (%)",
+      "WITHIN TAT",
+      "TAT BREACH",
+      "TOTAL",
+      "BREACH PERCENTAGE",
     ];
     sheet.addRow(headerValues);
     const headerRow = sheet.getRow(2);
@@ -1755,10 +1759,10 @@ exports.exportOutstandingBranch = async (req, res) => {
     // --- Header row ---
     const headerValues = [
       "BRANCH",
-      "OUTSTANDING (WITHIN TAT)",
-      "OUTSTANDING (BREACHED TAT)",
-      "TOTAL OUTSTANDING",
-      "WITHIN TAT (%)",
+      "WITHIN TAT",
+      "TAT BREACH",
+      "TOTAL",
+      "BREACH PERCENTAGE",
     ];
     sheet.addRow(headerValues);
     const headerRow = sheet.getRow(2);
