@@ -1,51 +1,76 @@
 module.exports = (app) => {
-  const compliance = require("../controllers/compliance.controller");
   const router = require("express").Router();
+  const closedFiles = require("../controllers/compliance/closedFiles.controller");
+  const complianceRatioInsurer = require("../controllers/compliance/complianceRatioInsurer.controller");
+  const complianceRatioBranch = require("../controllers/compliance/complianceRatioBranch.controller");
+  const outstandingInsurer = require("../controllers/compliance/outstandingInsurer.controller");
+  const outstandingBranch = require("../controllers/compliance/outstandingBranch.controller");
+  const outstandingDaysInsurer = require("../controllers/compliance/outstandingDaysInsurer.controller");
+  const outstandingDaysBranch = require("../controllers/compliance/outstandingDaysBranch.controller");
+  const ratioCalculatorInsurer = require("../controllers/compliance/ratioCalculatorInsurer.controller");
 
   // Compliance: Closed Files by Department
-  router.get("/closed-files", compliance.getClosedFilesComplianceReport);
+  router.get("/closed-files", closedFiles.getClosedFilesComplianceReport);
   router.get(
     "/closed-files/export",
-    compliance.exportClosedFilesComplianceReport
+    closedFiles.exportClosedFilesComplianceReport
   );
 
   // Compliance: Ratio By Insurer
-  router.get("/ratio-insurer", compliance.getComplianceRatioInsurer);
-  router.get("/ratio-insurer/export", compliance.exportComplianceRatioInsurer);
+  router.get(
+    "/ratio-insurer",
+    complianceRatioInsurer.getComplianceRatioInsurer
+  );
+  router.get(
+    "/ratio-insurer/export",
+    complianceRatioInsurer.exportComplianceRatioInsurer
+  );
 
   // Compliance: Ratio By Branch
-  router.get("/ratio-branch", compliance.getComplianceRatioBranch);
-  router.get("/ratio-branch/export", compliance.exportComplianceRatioBranch);
+  router.get("/ratio-branch", complianceRatioBranch.getComplianceRatioBranch);
+  router.get(
+    "/ratio-branch/export",
+    complianceRatioBranch.exportComplianceRatioBranch
+  );
 
   // Outstanding Assignment (By Insurer)
-  router.get("/outstanding-insurer", compliance.getOutstandingInsurer);
+  router.get("/outstanding-insurer", outstandingInsurer.getOutstandingInsurer);
   router.get(
     "/outstanding-insurer/export",
-    compliance.exportOutstandingInsurer
+    outstandingInsurer.exportOutstandingInsurer
   );
 
   // Outstanding Assignment (By Branch)
-  router.get("/outstanding-branch", compliance.getOutstandingBranch);
-  router.get("/outstanding-branch/export", compliance.exportOutstandingBranch);
+  router.get("/outstanding-branch", outstandingBranch.getOutstandingBranch);
+  router.get(
+    "/outstanding-branch/export",
+    outstandingBranch.exportOutstandingBranch
+  );
 
   // Outstanding Assignment by Days (Insurer)
-  router.get("/outstanding-days-insurer", compliance.getOutstandingDaysInsurer);
+  router.get(
+    "/outstanding-days-insurer",
+    outstandingDaysInsurer.getOutstandingDaysInsurer
+  );
   router.get(
     "/outstanding-days-insurer/export",
-    compliance.exportOutstandingDaysInsurer
+    outstandingDaysInsurer.exportOutstandingDaysInsurer
   );
 
   // Outstanding Assignment by Days (Branch)
-  router.get("/outstanding-days-branch", compliance.getOutstandingDaysBranch);
+  router.get(
+    "/outstanding-days-branch",
+    outstandingDaysBranch.getOutstandingDaysBranch
+  );
   router.get(
     "/outstanding-days-branch/export",
-    compliance.exportOutstandingDaysBranch
+    outstandingDaysBranch.exportOutstandingDaysBranch
   );
 
   // Ratio Calculator by Closed Files (Insurer)
   router.get(
     "/ratio-calculator-insurer/export",
-    compliance.exportRatioCalculatorInsurer
+    ratioCalculatorInsurer.exportRatioCalculatorInsurer
   );
 
   app.use("/api/compliance", router);
