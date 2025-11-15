@@ -1,20 +1,7 @@
 const db = require("../../models");
 const ExcelJS = require("exceljs");
 
-// Helper: get branch codes in order
-const BRANCH_CODES = [
-  "KLHQ",
-  "TAKAFUL",
-  "SP",
-  "PG",
-  "IP",
-  "KTN",
-  "KB",
-  "MK",
-  "JB",
-  "KK",
-  "KCH",
-];
+// Remove static BRANCH_CODES
 
 exports.exportComplianceTable = async (req, res) => {
   try {
@@ -39,19 +26,16 @@ exports.exportComplianceTable = async (req, res) => {
     });
     const tatMax = tatChart ? tatChart.tatMax : 42;
 
-    // Get all branches
+    // Get all branches, sorted by brCode alphabetically
     const branches = await db.branch.findAll({
       attributes: ["id", "name", "brCode"],
+      order: [["brCode", "ASC"]],
     });
+    // Build branch code list and map
+    const BRANCH_CODES = branches.map((b) => b.brCode);
     const branchCodeMap = {};
     branches.forEach((b) => {
-      branchCodeMap[b.id] =
-        b.brCode ||
-        b.name
-          .split(" ")
-          .map((w) => w[0])
-          .join("")
-          .toUpperCase();
+      branchCodeMap[b.id] = b.brCode;
     });
 
     // Get closed files for the month, insurer, department, fileClass
@@ -73,10 +57,10 @@ exports.exportComplianceTable = async (req, res) => {
     // Prepare stats per branch
     const stats = {};
     BRANCH_CODES.forEach((code) => {
-      stats[code] = { compiled: 0, notCompiled: 0, total: 0 };
+      stats[code] = { complied: 0, notComplied: 0, total: 0 };
     });
-    let totalCompiled = 0,
-      totalNotCompiled = 0,
+    let totalComplied = 0,
+      totalNotComplied = 0,
       totalFiles = 0;
 
     files.forEach((file) => {
@@ -92,27 +76,30 @@ exports.exportComplianceTable = async (req, res) => {
         );
       }
       if (days <= tatMax) {
-        stats[branchCode].compiled += 1;
-        totalCompiled += 1;
+        stats[branchCode].complied += 1;
+        totalComplied += 1;
       } else {
-        stats[branchCode].notCompiled += 1;
-        totalNotCompiled += 1;
+        stats[branchCode].notComplied += 1;
+        totalNotComplied += 1;
       }
       stats[branchCode].total += 1;
       totalFiles += 1;
     });
 
-    // Prepare compiled % row
-    const compiledPercents = BRANCH_CODES.map((code) => {
+    // Prepare complied % row
+    const compliedPercents = BRANCH_CODES.map((code) => {
       const s = stats[code];
-      return s.total > 0 ? ((s.compiled / s.total) * 100).toFixed(2) : "0.00";
+      return s.total > 0 ? ((s.complied / s.total) * 100).toFixed(2) : "0.00";
     });
     const overallPercent =
-      totalFiles > 0 ? ((totalCompiled / totalFiles) * 100).toFixed(2) : "0.00";
+      totalFiles > 0 ? ((totalComplied / totalFiles) * 100).toFixed(2) : "0.00";
 
     // Excel generation
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Compliance Table");
+
+    // Calculate dynamic width for merged cells (number of columns)
+    const totalCols = BRANCH_CODES.length + 2; // 1 for label, 1 for TOTAL
 
     // Header row (row 1)
     sheet.addRow([
@@ -120,41 +107,42 @@ exports.exportComplianceTable = async (req, res) => {
       `COMPLIANCE RATIO - ${new Date(startDate)
         .toLocaleString("default", { month: "long", year: "numeric" })
         .toUpperCase()}`,
+      // ...fill empty cells to match totalCols...
+      ...Array(totalCols - 2).fill(""),
     ]);
-    sheet.mergeCells("A1:L1");
+    sheet.mergeCells(`A1:${String.fromCharCode(65 + totalCols - 1)}1`);
     sheet.getRow(1).height = 29;
     sheet.getCell("A1").font = { name: "Calibri", size: 14, bold: true };
     sheet.getCell("A1").alignment = { vertical: "middle", horizontal: "left" };
-    sheet.getCell("B1").font = { name: "Calibri", size: 14, bold: true };
-    sheet.getCell("B1").alignment = { vertical: "middle", horizontal: "right" };
 
-    // Empty rows for spacing
-    sheet.addRow([]);
-    sheet.addRow([]);
-    sheet.addRow([]);
+    // Empty row for spacing
     sheet.addRow([]);
 
-    // Data column title (row 7)
+    // Data column title (row 3)
     sheet.addRow([
       `${deptName} FULL ASSIGNMENT COMPLIANCE RATIO - BASED ON CLOSED FILES`,
+      ...Array(totalCols - 1).fill(""),
     ]);
-    sheet.mergeCells("A7:L7");
-    const titleRow = sheet.getRow(7);
+    sheet.mergeCells(`A3:${String.fromCharCode(65 + totalCols - 1)}3`);
+    const titleRow = sheet.getRow(3);
     titleRow.height = 31.5;
     titleRow.getCell(1).font = { name: "Verdana", size: 11, bold: true };
     titleRow.getCell(1).alignment = { vertical: "middle", horizontal: "left" };
-    titleRow.getCell(1).fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FF92D050" },
-    };
+    // Set background color for all merged cells in row 3
+    for (let i = 1; i <= totalCols; i++) {
+      titleRow.getCell(i).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF92D050" },
+      };
+    }
 
-    // Data column header (row 8, starts at col 2)
+    // Data column header (row 4, starts at col 2)
     const headerRowValues = ["", ...BRANCH_CODES, "TOTAL"];
     sheet.addRow(headerRowValues);
-    const headerRow = sheet.getRow(8);
+    const headerRow = sheet.getRow(4);
     headerRow.height = 24.5;
-    for (let i = 2; i <= BRANCH_CODES.length + 2; i++) {
+    for (let i = 2; i <= totalCols; i++) {
       const cell = headerRow.getCell(i);
       cell.font = { name: "Tahoma", size: 11, bold: true };
       cell.alignment = { vertical: "middle", horizontal: "center" };
@@ -167,56 +155,56 @@ exports.exportComplianceTable = async (req, res) => {
     }
 
     // Data rows
-    // Row 9: Compiled
-    const compiledRow = ["Compiled"];
-    BRANCH_CODES.forEach((code) => compiledRow.push(stats[code].compiled));
-    compiledRow.push(totalCompiled);
-    sheet.addRow(compiledRow);
-    const compiledRowObj = sheet.getRow(9);
-    compiledRowObj.height = 18;
-    for (let i = 2; i <= BRANCH_CODES.length + 2; i++) {
-      compiledRowObj.getCell(i).font = {
+    // Row 5: Complied
+    const compliedRow = ["Complied"];
+    BRANCH_CODES.forEach((code) => compliedRow.push(stats[code].complied));
+    compliedRow.push(totalComplied);
+    sheet.addRow(compliedRow);
+    const compliedRowObj = sheet.getRow(5);
+    compliedRowObj.height = 18;
+    for (let i = 2; i <= totalCols; i++) {
+      compliedRowObj.getCell(i).font = {
         name: "Tahoma",
         size: 11,
         bold: true,
         color: { argb: "FF000000" },
       };
-      compiledRowObj.getCell(i).alignment = {
+      compliedRowObj.getCell(i).alignment = {
         vertical: "middle",
         horizontal: "center",
       };
     }
 
-    // Row 10: Not Compiled
-    const notCompiledRow = ["Not Compiled"];
+    // Row 6: Not Complied
+    const notCompliedRow = ["Not Complied"];
     BRANCH_CODES.forEach((code) =>
-      notCompiledRow.push(stats[code].notCompiled)
+      notCompliedRow.push(stats[code].notComplied)
     );
-    notCompiledRow.push(totalNotCompiled);
-    sheet.addRow(notCompiledRow);
-    const notCompiledRowObj = sheet.getRow(10);
-    notCompiledRowObj.height = 18;
-    for (let i = 2; i <= BRANCH_CODES.length + 2; i++) {
-      notCompiledRowObj.getCell(i).font = {
+    notCompliedRow.push(totalNotComplied);
+    sheet.addRow(notCompliedRow);
+    const notCompliedRowObj = sheet.getRow(6);
+    notCompliedRowObj.height = 18;
+    for (let i = 2; i <= totalCols; i++) {
+      notCompliedRowObj.getCell(i).font = {
         name: "Tahoma",
         size: 11,
         bold: false,
         color: { argb: "FFFF0000" },
       };
-      notCompiledRowObj.getCell(i).alignment = {
+      notCompliedRowObj.getCell(i).alignment = {
         vertical: "middle",
         horizontal: "center",
       };
     }
 
-    // Row 11: Total
+    // Row 7: Total
     const totalRow = ["Total"];
     BRANCH_CODES.forEach((code) => totalRow.push(stats[code].total));
     totalRow.push(totalFiles);
     sheet.addRow(totalRow);
-    const totalRowObj = sheet.getRow(11);
+    const totalRowObj = sheet.getRow(7);
     totalRowObj.height = 18;
-    for (let i = 2; i <= BRANCH_CODES.length + 2; i++) {
+    for (let i = 2; i <= totalCols; i++) {
       totalRowObj.getCell(i).font = {
         name: "Tahoma",
         size: 11,
@@ -229,17 +217,17 @@ exports.exportComplianceTable = async (req, res) => {
       };
     }
 
-    // Row 12: Compiled %
-    const percentRow = ["Compiled %"];
+    // Row 8: Complied %
+    const percentRow = ["Complied %"];
     BRANCH_CODES.forEach((code, idx) => {
-      const percent = compiledPercents[idx];
+      const percent = compliedPercents[idx];
       percentRow.push(percent);
     });
     percentRow.push(overallPercent);
     sheet.addRow(percentRow);
-    const percentRowObj = sheet.getRow(12);
+    const percentRowObj = sheet.getRow(8);
     percentRowObj.height = 18;
-    for (let i = 2; i <= BRANCH_CODES.length + 2; i++) {
+    for (let i = 2; i <= totalCols; i++) {
       const percent = parseFloat(percentRowObj.getCell(i).value);
       percentRowObj.getCell(i).font = {
         name: "Tahoma",
@@ -253,28 +241,28 @@ exports.exportComplianceTable = async (req, res) => {
       };
     }
 
-    // Row 13: TAT and Overall Ratio
+    // Row 9: TAT and Overall Ratio
     sheet.addRow([]);
-    const tatRow = sheet.getRow(13);
+    const tatRow = sheet.getRow(9);
     tatRow.height = 29;
     tatRow.getCell(1).value = `TAT - FULL - ${tatMax} CALENDAR DAYS`;
     tatRow.getCell(1).font = { name: "Tahoma", size: 14, bold: true };
     tatRow.getCell(1).alignment = { vertical: "middle", horizontal: "left" };
-    tatRow.getCell(1).fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FFEBF1DE" },
-    };
-    sheet.mergeCells(`A13:G13`);
+    // Set background color for all occupied cells in row 9
+    for (let i = 1; i <= totalCols; i++) {
+      tatRow.getCell(i).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFEBF1DE" },
+      };
+    }
+    sheet.mergeCells(`A9:G9`);
 
     tatRow.getCell(8).value = "OVERALL RATIO";
     tatRow.getCell(8).font = { name: "Tahoma", size: 14, bold: true };
-    tatRow.getCell(8).alignment = { vertical: "middle", horizontal: "center" };
-    tatRow.getCell(8).fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FFEBF1DE" },
-    };
+    tatRow.getCell(8).alignment = { vertical: "middle", horizontal: "left" };
+    // No need to set fill again, already set above
+    sheet.mergeCells(`H9:L9`);
 
     tatRow.getCell(BRANCH_CODES.length + 2).value = overallPercent;
     tatRow.getCell(BRANCH_CODES.length + 2).font = {
@@ -286,6 +274,7 @@ exports.exportComplianceTable = async (req, res) => {
       vertical: "middle",
       horizontal: "center",
     };
+    // No need to set fill again, already set above
 
     // Set column widths
     for (let i = 1; i <= BRANCH_CODES.length + 2; i++) {
