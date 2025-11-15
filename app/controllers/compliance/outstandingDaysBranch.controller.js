@@ -214,7 +214,7 @@ exports.exportOutstandingDaysBranch = async (req, res) => {
     ];
     sheet.addRow(headerValues);
     const headerRow = sheet.getRow(2);
-    headerRow.height = 22;
+    headerRow.height = 41.25;
     headerRow.eachCell((cell) => {
       cell.font = {
         name: "Calibri",
@@ -222,7 +222,11 @@ exports.exportOutstandingDaysBranch = async (req, res) => {
         bold: true,
         color: { argb: "FFFFFFFF" },
       };
-      cell.alignment = { vertical: "middle", horizontal: "center" };
+      cell.alignment = {
+        vertical: "middle",
+        horizontal: "center",
+        wrapText: true,
+      };
       cell.fill = {
         type: "pattern",
         pattern: "solid",

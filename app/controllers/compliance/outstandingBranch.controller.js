@@ -76,11 +76,12 @@ exports.getOutstandingBranch = async (req, res) => {
       result[branchId].total += 1;
     });
 
+    // Change percent calculation to breach percentage
     const reportData = Object.entries(result)
       .map(([branchId, counts]) => {
         const percent =
           counts.total > 0
-            ? ((counts.withinTat / counts.total) * 100).toFixed(2)
+            ? ((counts.breachedTat / counts.total) * 100).toFixed(2)
             : "0.00";
         return {
           branch: branchMap[branchId] || "Unknown",
@@ -174,7 +175,7 @@ exports.exportOutstandingBranch = async (req, res) => {
       .map(([branchId, counts]) => {
         const percent =
           counts.total > 0
-            ? ((counts.withinTat / counts.total) * 100).toFixed(2)
+            ? ((counts.breachedTat / counts.total) * 100).toFixed(2)
             : "0.00";
         return {
           branch: branchMap[branchId] || "Unknown",
@@ -187,7 +188,6 @@ exports.exportOutstandingBranch = async (req, res) => {
       .sort((a, b) => a.branch.localeCompare(b.branch));
 
     // Excel generation
-    const ExcelJS = require("exceljs");
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Outstanding (Branch)");
 
@@ -224,7 +224,7 @@ exports.exportOutstandingBranch = async (req, res) => {
     ];
     sheet.addRow(headerValues);
     const headerRow = sheet.getRow(2);
-    headerRow.height = 20;
+    headerRow.height = 42;
     headerRow.eachCell((cell) => {
       cell.font = {
         name: "Tahoma",
@@ -232,7 +232,11 @@ exports.exportOutstandingBranch = async (req, res) => {
         bold: true,
         color: { argb: "FF000000" },
       };
-      cell.alignment = { vertical: "middle", horizontal: "center" };
+      cell.alignment = {
+        vertical: "middle",
+        horizontal: "center",
+        wrapText: true,
+      };
       cell.fill = {
         type: "pattern",
         pattern: "solid",
@@ -256,12 +260,16 @@ exports.exportOutstandingBranch = async (req, res) => {
       totalWithinTat += row.withinTat;
       totalBreachedTat += row.breachedTat;
       totalFiles += row.total;
+      const breachPercent =
+        row.total > 0
+          ? ((row.breachedTat / row.total) * 100).toFixed(2)
+          : "0.00";
       const values = [
         String(row.branch).toUpperCase(),
         row.withinTat,
         row.breachedTat,
         row.total,
-        row.percent,
+        breachPercent,
       ];
       sheet.addRow(values);
       const dataRow = sheet.getRow(rowIdx);
@@ -270,6 +278,7 @@ exports.exportOutstandingBranch = async (req, res) => {
       for (let col = 2; col <= 5; col++) {
         dataRow.getCell(col).font = { name: "Tahoma", size: 11, bold: true };
       }
+      // Breached TAT column (3rd col): red text
       dataRow.getCell(3).font = {
         name: "Tahoma",
         size: 11,
@@ -292,16 +301,16 @@ exports.exportOutstandingBranch = async (req, res) => {
     });
 
     // Totals row
-    const overallPercent =
+    const overallBreachPercent =
       totalFiles > 0
-        ? ((totalWithinTat / totalFiles) * 100).toFixed(2)
+        ? ((totalBreachedTat / totalFiles) * 100).toFixed(2)
         : "0.00";
     sheet.addRow([
       "TOTAL",
       totalWithinTat,
       totalBreachedTat,
       totalFiles,
-      overallPercent,
+      overallBreachPercent,
     ]);
     const totalRow = sheet.getRow(rowIdx);
     totalRow.height = 18;
@@ -327,7 +336,7 @@ exports.exportOutstandingBranch = async (req, res) => {
     });
 
     // OVERALL RATIO row
-    sheet.addRow(["WITHIN TAT RATIO", "", "", "", overallPercent]);
+    sheet.addRow(["OVERALL RATIO", "", "", "", overallBreachPercent]);
     const overallRow = sheet.getRow(rowIdx + 1);
     overallRow.height = 39.75;
     sheet.mergeCells(`A${rowIdx + 1}:D${rowIdx + 1}`);
@@ -341,7 +350,7 @@ exports.exportOutstandingBranch = async (req, res) => {
       pattern: "solid",
       fgColor: { argb: "FFEDEDED" },
     };
-    overallRow.getCell(1).value = "WITHIN TAT RATIO";
+    overallRow.getCell(1).value = "OVERALL RATIO";
     overallRow.getCell(5).font = { name: "Tahoma", size: 18, bold: true };
     overallRow.getCell(5).alignment = {
       vertical: "middle",
@@ -352,7 +361,7 @@ exports.exportOutstandingBranch = async (req, res) => {
       pattern: "solid",
       fgColor: { argb: "FFEDEDED" },
     };
-    overallRow.getCell(5).value = overallPercent;
+    overallRow.getCell(5).value = overallBreachPercent;
 
     // Set column widths
     sheet.getColumn(1).width = 28;

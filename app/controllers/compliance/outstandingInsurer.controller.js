@@ -214,7 +214,7 @@ exports.exportOutstandingInsurer = async (req, res) => {
     ];
     sheet.addRow(headerValues);
     const headerRow = sheet.getRow(2);
-    headerRow.height = 20;
+    headerRow.height = 42;
     headerRow.eachCell((cell) => {
       cell.font = {
         name: "Tahoma",
@@ -222,7 +222,11 @@ exports.exportOutstandingInsurer = async (req, res) => {
         bold: true,
         color: { argb: "FF000000" },
       };
-      cell.alignment = { vertical: "middle", horizontal: "center" };
+      cell.alignment = {
+        vertical: "middle",
+        horizontal: "center",
+        wrapText: true,
+      };
       cell.fill = {
         type: "pattern",
         pattern: "solid",
@@ -246,12 +250,16 @@ exports.exportOutstandingInsurer = async (req, res) => {
       totalWithinTat += row.withinTat;
       totalBreachedTat += row.breachedTat;
       totalFiles += row.total;
+      const breachPercent =
+        row.total > 0
+          ? ((row.breachedTat / row.total) * 100).toFixed(2)
+          : "0.00";
       const values = [
         String(row.insurer).toUpperCase(),
         row.withinTat,
         row.breachedTat,
         row.total,
-        row.percent,
+        breachPercent,
       ];
       sheet.addRow(values);
       const dataRow = sheet.getRow(rowIdx);
@@ -283,16 +291,16 @@ exports.exportOutstandingInsurer = async (req, res) => {
     });
 
     // Totals row
-    const overallPercent =
+    const overallBreachPercent =
       totalFiles > 0
-        ? ((totalWithinTat / totalFiles) * 100).toFixed(2)
+        ? ((totalBreachedTat / totalFiles) * 100).toFixed(2)
         : "0.00";
     sheet.addRow([
       "TOTAL",
       totalWithinTat,
       totalBreachedTat,
       totalFiles,
-      overallPercent,
+      overallBreachPercent,
     ]);
     const totalRow = sheet.getRow(rowIdx);
     totalRow.height = 18;
@@ -318,7 +326,7 @@ exports.exportOutstandingInsurer = async (req, res) => {
     });
 
     // OVERALL RATIO row
-    sheet.addRow(["OVERALL RATIO", "", "", "", overallPercent]);
+    sheet.addRow(["OVERALL RATIO", "", "", "", overallBreachPercent]);
     const overallRow = sheet.getRow(rowIdx + 1);
     overallRow.height = 39.75;
     // Merge first four columns
@@ -346,7 +354,7 @@ exports.exportOutstandingInsurer = async (req, res) => {
       pattern: "solid",
       fgColor: { argb: "FFEDEDED" },
     };
-    overallRow.getCell(5).value = overallPercent;
+    overallRow.getCell(5).value = overallBreachPercent;
 
     // Set column widths
     sheet.getColumn(1).width = 28;
