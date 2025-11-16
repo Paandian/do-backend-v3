@@ -1,2 +1,0 @@
-(window["webpackJsonp"]=window["webpackJsonp"]||[]).push([["chunk-2d0b2557"],{2454:function(n,s,t){"use strict";t.r(s);var e=t("0798"),a=t("b0af"),u=function(){var n=this,s=n._self._c;return s(a["a"],{staticClass:"pa-4"},[s("h2",[n._v("Outstanding Assignment by Days (Insurer)")]),s(e["a"],{attrs:{type:"info",outlined:""}},[n._v(" 🚧 This feature is under development. Coming soon! 🚧 ")])],1)},i=[],r={name:"OutstandingDaysInsurer"},o=r,l=t("2877"),c=Object(l["a"])(o,u,i,!1,null,null,null);s["default"]=c.exports}}]);
-//# sourceMappingURL=chunk-2d0b2557.1d37c228.js.map

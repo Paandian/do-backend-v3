@@ -1,2 +1,0 @@
-(window["webpackJsonp"]=window["webpackJsonp"]||[]).push([["chunk-2d22ccd1"],{f57c:function(n,e,a){"use strict";a.r(e);var t=a("0798"),o=a("b0af"),s=function(){var n=this,e=n._self._c;return e(o["a"],{staticClass:"pa-4"},[e("h2",[n._v("Compliance Ratio (By Insurer)")]),e(t["a"],{attrs:{type:"info",outlined:""}},[n._v(" 🚧 This feature is under development. Coming soon! 🚧 ")])],1)},i=[],u={name:"ComplianceRatioInsurer"},c=u,r=a("2877"),l=Object(r["a"])(c,s,i,!1,null,null,null);e["default"]=l.exports}}]);
-//# sourceMappingURL=chunk-2d22ccd1.3790190d.js.map

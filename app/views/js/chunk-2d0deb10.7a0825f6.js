@@ -1,2 +1,0 @@
-(window["webpackJsonp"]=window["webpackJsonp"]||[]).push([["chunk-2d0deb10"],{8772:function(n,t,e){"use strict";e.r(t);var s=e("0798"),a=e("b0af"),i=function(){var n=this,t=n._self._c;return t(a["a"],{staticClass:"pa-4"},[t("h2",[n._v("Outstanding Master List")]),t(s["a"],{attrs:{type:"info",outlined:""}},[n._v(" 🚧 This feature is under development. Coming soon! 🚧 ")])],1)},u=[],o={name:"OutstandingMaster"},r=o,l=e("2877"),d=Object(l["a"])(r,i,u,!1,null,null,null);t["default"]=d.exports}}]);
-//# sourceMappingURL=chunk-2d0deb10.7a0825f6.js.map

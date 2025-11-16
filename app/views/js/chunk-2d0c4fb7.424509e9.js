@@ -1,2 +1,0 @@
-(window["webpackJsonp"]=window["webpackJsonp"]||[]).push([["chunk-2d0c4fb7"],{"3cc4":function(n,e,a){"use strict";a.r(e);var t=a("0798"),l=a("b0af"),o=function(){var n=this,e=n._self._c;return e(l["a"],{staticClass:"pa-4"},[e("h2",[n._v("Compliance Table")]),e(t["a"],{attrs:{type:"info",outlined:""}},[n._v(" 🚧 This feature is under development. Coming soon! 🚧 ")])],1)},s=[],c={name:"ComplianceTable"},i=c,u=a("2877"),p=Object(u["a"])(i,o,s,!1,null,null,null);e["default"]=p.exports}}]);
-//# sourceMappingURL=chunk-2d0c4fb7.424509e9.js.map
