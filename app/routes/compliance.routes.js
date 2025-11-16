@@ -10,6 +10,8 @@ module.exports = (app) => {
   const ratioCalculatorInsurer = require("../controllers/compliance/ratioCalculatorInsurer.controller");
   const complianceTable = require("../controllers/compliance/complianceTable.controller");
   const outstandingMaster = require("../controllers/compliance/outstandingMaster.controller");
+  const closedByAdjuster = require("../controllers/compliance/closedByAdjuster.controller");
+  const closedByClerk = require("../controllers/compliance/closedByClerk.controller");
 
   // Compliance: Closed Files by Department
   router.get("/closed-files", closedFiles.getClosedFilesComplianceReport);
@@ -83,6 +85,15 @@ module.exports = (app) => {
     "/outstanding-master/export",
     outstandingMaster.exportOutstandingMaster
   );
+
+  // Closed Assignments by Adjuster
+  router.get(
+    "/closed-by-adjuster/export",
+    closedByAdjuster.exportClosedByAdjuster
+  );
+
+  // Closed Assignments by Clerk
+  router.get("/closed-by-clerk/export", closedByClerk.exportClosedByClerk);
 
   app.use("/api/compliance", router);
 };
