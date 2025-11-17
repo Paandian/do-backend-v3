@@ -128,4 +128,8 @@ db.user.hasOne(db.refreshToken, {
 //   "account",
 // ];
 
+// Fix association for casefiles -> inss (insurer)
+db.casefiles.belongsTo(db.inss, { foreignKey: "insurer", as: "insurerRef" });
+db.inss.hasMany(db.casefiles, { foreignKey: "insurer", as: "files" });
+
 module.exports = db;
