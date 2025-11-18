@@ -401,6 +401,8 @@ exports.exportComplianceRatioInsurerDept = async (req, res) => {
           });
           const className = subDeptMap[classKey] || classKey;
           const deptName = deptMap[deptId] || deptId;
+          const percentValue =
+            totalC > 0 ? ((compliedC / totalC) * 100).toFixed(2) : "0.00";
           const classRow = sheet.addRow([
             `${String(
               insInfo.code || insInfo.name
@@ -408,7 +410,7 @@ exports.exportComplianceRatioInsurerDept = async (req, res) => {
             compliedC,
             notCompliedC,
             totalC,
-            totalC > 0 ? ((compliedC / totalC) * 100).toFixed(2) : "0.00",
+            percentValue,
           ]);
           classRow.height = 18;
           classRow.getCell(1).font = { name: "Tahoma", size: 12, bold: false };
@@ -440,6 +442,14 @@ exports.exportComplianceRatioInsurerDept = async (req, res) => {
               bottom: { style: "thin" },
               right: { style: "thin" },
             };
+            // Highlight row if compliance < 80%
+            if (parseFloat(percentValue) < 80) {
+              cell.fill = {
+                type: "pattern",
+                pattern: "solid",
+                fgColor: { argb: "FFFFEEEE" }, // light red
+              };
+            }
           });
           rowIdx++;
         }
@@ -481,6 +491,8 @@ exports.exportComplianceRatioInsurerDept = async (req, res) => {
           });
           const className = subDeptMap[classKey] || classKey;
           const deptName = deptMap[deptId] || deptId;
+          const percentValue =
+            totalC > 0 ? ((compliedC / totalC) * 100).toFixed(2) : "0.00";
           const classRow = sheet.addRow([
             `${String(
               insInfo.code || insInfo.name
@@ -488,7 +500,7 @@ exports.exportComplianceRatioInsurerDept = async (req, res) => {
             compliedC,
             notCompliedC,
             totalC,
-            totalC > 0 ? ((compliedC / totalC) * 100).toFixed(2) : "0.00",
+            percentValue,
           ]);
           classRow.height = 18;
           classRow.getCell(1).font = { name: "Tahoma", size: 12, bold: false };
@@ -520,6 +532,14 @@ exports.exportComplianceRatioInsurerDept = async (req, res) => {
               bottom: { style: "thin" },
               right: { style: "thin" },
             };
+            // Highlight row if compliance < 80%
+            if (parseFloat(percentValue) < 80) {
+              cell.fill = {
+                type: "pattern",
+                pattern: "solid",
+                fgColor: { argb: "FFFFEEEE" }, // light red
+              };
+            }
           });
           rowIdx++;
         }
@@ -565,6 +585,8 @@ exports.exportComplianceRatioInsurerDept = async (req, res) => {
             });
             const className = subDeptMap[classKey] || classKey;
             const deptName = deptMap[deptKey] || deptKey;
+            const percentValue =
+              totalC > 0 ? ((compliedC / totalC) * 100).toFixed(2) : "0.00";
             const classRow = sheet.addRow([
               `${String(
                 insInfo.code || insInfo.name
@@ -572,7 +594,7 @@ exports.exportComplianceRatioInsurerDept = async (req, res) => {
               compliedC,
               notCompliedC,
               totalC,
-              totalC > 0 ? ((compliedC / totalC) * 100).toFixed(2) : "0.00",
+              percentValue,
             ]);
             classRow.height = 18;
             classRow.getCell(1).font = {
@@ -608,6 +630,14 @@ exports.exportComplianceRatioInsurerDept = async (req, res) => {
                 bottom: { style: "thin" },
                 right: { style: "thin" },
               };
+              // Highlight row if compliance < 80%
+              if (parseFloat(percentValue) < 80) {
+                cell.fill = {
+                  type: "pattern",
+                  pattern: "solid",
+                  fgColor: { argb: "FFFFEEEE" }, // light red
+                };
+              }
             });
             rowIdx++;
           }
@@ -651,6 +681,8 @@ exports.exportComplianceRatioInsurerDept = async (req, res) => {
           });
           const className = subDeptMap[classificationId] || classificationId;
           const deptName = deptMap[deptKey] || deptKey;
+          const percentValue =
+            totalC > 0 ? ((compliedC / totalC) * 100).toFixed(2) : "0.00";
           const classRow = sheet.addRow([
             `${String(
               insInfo.code || insInfo.name
@@ -658,7 +690,7 @@ exports.exportComplianceRatioInsurerDept = async (req, res) => {
             compliedC,
             notCompliedC,
             totalC,
-            totalC > 0 ? ((compliedC / totalC) * 100).toFixed(2) : "0.00",
+            percentValue,
           ]);
           classRow.height = 18;
           classRow.getCell(1).font = { name: "Tahoma", size: 12, bold: false };
@@ -690,6 +722,14 @@ exports.exportComplianceRatioInsurerDept = async (req, res) => {
               bottom: { style: "thin" },
               right: { style: "thin" },
             };
+            // Highlight row if compliance < 80%
+            if (parseFloat(percentValue) < 80) {
+              cell.fill = {
+                type: "pattern",
+                pattern: "solid",
+                fgColor: { argb: "FFFFEEEE" }, // light red
+              };
+            }
           });
           rowIdx++;
         }
@@ -736,6 +776,8 @@ exports.exportComplianceRatioInsurerDept = async (req, res) => {
               : "ALL CLASSIFICATION";
           const deptName =
             deptId !== "all" ? deptMap[deptId] || deptId : "ALL DEPARTMENT";
+          const percentValue =
+            totalC > 0 ? ((compliedC / totalC) * 100).toFixed(2) : "0.00";
           const classRow = sheet.addRow([
             `${String(
               insInfo.code || insInfo.name
@@ -743,7 +785,7 @@ exports.exportComplianceRatioInsurerDept = async (req, res) => {
             compliedC,
             notCompliedC,
             totalC,
-            totalC > 0 ? ((compliedC / totalC) * 100).toFixed(2) : "0.00",
+            percentValue,
           ]);
           classRow.height = 18;
           classRow.getCell(1).font = { name: "Tahoma", size: 12, bold: false };
@@ -775,6 +817,14 @@ exports.exportComplianceRatioInsurerDept = async (req, res) => {
               bottom: { style: "thin" },
               right: { style: "thin" },
             };
+            // Highlight row if compliance < 80%
+            if (parseFloat(percentValue) < 80) {
+              cell.fill = {
+                type: "pattern",
+                pattern: "solid",
+                fgColor: { argb: "FFFFEEEE" }, // light red
+              };
+            }
           });
           rowIdx++;
         }
