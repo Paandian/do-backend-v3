@@ -209,13 +209,32 @@ exports.exportClosedFilesComplianceReport = async (req, res) => {
       const dept = await db.dept.findByPk(deptId);
       if (dept) deptName = dept.name;
     }
-    // Format: TPBI CLOSED FILES - OCTOBER 2025
+
+    // Get file classification name if specified and not "all"/null
+    let className = "";
+    if (
+      classificationId &&
+      classificationId !== "all" &&
+      classificationId !== "null"
+    ) {
+      const subDept = await db.subDept.findByPk(classificationId);
+      if (subDept) className = subDept.subCode;
+    }
+    if (
+      !className ||
+      classificationId === "all" ||
+      classificationId === "null"
+    ) {
+      className = "All Classifications";
+    }
+
+    // Format: TPBI CLOSED FILES - OCTOBER 2025 (All Classifications)
     const monthObj = month ? new Date(`${month}-01`) : new Date();
     const monthName = monthObj
       .toLocaleString("default", { month: "long" })
       .toUpperCase();
     const year = monthObj.getFullYear();
-    const titleText = `${deptName.toUpperCase()} CLOSED FILES - ${monthName} ${year}`;
+    const titleText = `${deptName.toUpperCase()} CLOSED FILES - ${monthName} ${year} (${className})`;
     sheet.addRow([titleText]);
     sheet.mergeCells("A1:G1");
     const titleRow = sheet.getRow(1);
@@ -299,7 +318,10 @@ exports.exportClosedFilesComplianceReport = async (req, res) => {
         dataRow.height = 18;
         dataRow.eachCell((cell, colNumber) => {
           cell.font = { name: "Tahoma", size: 12, bold: true };
-          cell.alignment = { vertical: "middle", horizontal: "center" };
+          cell.alignment = {
+            vertical: "middle",
+            horizontal: colNumber === 1 ? "left" : "center",
+          }; // <-- left align branch
           cell.border = {
             top: { style: "thin" },
             left: { style: "thin" },
@@ -327,7 +349,10 @@ exports.exportClosedFilesComplianceReport = async (req, res) => {
       totalRow.height = 18;
       totalRow.eachCell((cell, colNumber) => {
         cell.font = { name: "Tahoma", size: 12, bold: true };
-        cell.alignment = { vertical: "middle", horizontal: "center" };
+        cell.alignment = {
+          vertical: "middle",
+          horizontal: colNumber === 1 ? "left" : "center",
+        }; // <-- left align branch
         cell.border = {
           top: { style: "thin" },
           left: { style: "thin" },
