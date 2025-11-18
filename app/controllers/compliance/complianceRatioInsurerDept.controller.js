@@ -832,49 +832,39 @@ exports.exportComplianceRatioInsurerDept = async (req, res) => {
     }
 
     // After all insurer rows and detail rows
-    // Calculate totals
+    // Calculate totals for filtered files (not unfiltered)
     let totalComplied = 0,
       totalNotComplied = 0,
       totalFiles = 0;
-    for (const insurerId of insurerIds) {
-      // Use the same logic as summary row for each insurer
-      const allClosedFilesForInsurer = await db.casefiles.findAll({
-        where: {
-          insurer: insurerId,
-          fileStatus: { [db.Sequelize.Op.in]: ["CLO", "CLOSED"] },
-          dateClosed: { [db.Sequelize.Op.between]: [startDate, endDate] },
-        },
-        attributes: ["subRefType", "dateOfAssign", "dateClosed"],
-      });
-
-      allClosedFilesForInsurer.forEach((file) => {
-        const tatKey = `${insurerId}-${String(file.subRefType)}`;
-        const tatDays = tatMap.hasOwnProperty(tatKey) ? tatMap[tatKey] : null;
-        let days = 0;
-        if (file.dateOfAssign && file.dateClosed) {
-          days = Math.abs(
-            Math.floor(
-              (new Date(file.dateClosed) - new Date(file.dateOfAssign)) /
-                (1000 * 60 * 60 * 24)
-            )
-          );
-        }
-        if (
-          tatDays === null ||
-          typeof tatDays === "undefined" ||
-          days <= tatDays
-        ) {
-          totalComplied += 1;
-        } else {
-          totalNotComplied += 1;
-        }
-        totalFiles += 1;
-      });
-    }
+    files.forEach((file) => {
+      const insurerId = String(file.insurer);
+      const subRefTypeId = String(file.subRefType);
+      const tatKey = `${insurerId}-${subRefTypeId}`;
+      const tatDays = tatMap.hasOwnProperty(tatKey) ? tatMap[tatKey] : null;
+      let days = 0;
+      if (file.dateOfAssign && file.dateClosed) {
+        days = Math.abs(
+          Math.floor(
+            (new Date(file.dateClosed) - new Date(file.dateOfAssign)) /
+              (1000 * 60 * 60 * 24)
+          )
+        );
+      }
+      if (
+        tatDays === null ||
+        typeof tatDays === "undefined" ||
+        days <= tatDays
+      ) {
+        totalComplied += 1;
+      } else {
+        totalNotComplied += 1;
+      }
+      totalFiles += 1;
+    });
     const totalPercent =
       totalFiles > 0 ? ((totalComplied / totalFiles) * 100).toFixed(2) : "0.00";
 
-    // Add total row
+    // Add total row (filtered compliance ratio)
     const totalRow = sheet.addRow([
       "TOTAL",
       totalComplied,
