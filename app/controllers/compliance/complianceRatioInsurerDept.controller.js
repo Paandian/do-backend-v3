@@ -110,6 +110,13 @@ exports.getComplianceRatioInsurerDept = async (req, res) => {
   }
 };
 
+function sanitizeExcelValue(val) {
+  if (val === null || val === undefined) return "";
+  if (typeof val === "object") return JSON.stringify(val);
+  // Remove non-printable/control characters
+  return String(val).replace(/[\x00-\x1F\x7F-\x9F]/g, "");
+}
+
 // --- Compliance Ratio (By Insurer, Filtered by Dept & Classification) - Excel Export ---
 exports.exportComplianceRatioInsurerDept = async (req, res) => {
   try {
@@ -153,99 +160,14 @@ exports.exportComplianceRatioInsurerDept = async (req, res) => {
       tatMap[`${String(t.insId)}-${String(t.subDeptId)}`] = t.tatMax;
     });
 
-    // Prepare Excel
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet("Compliance Ratio (Insurer/Dept)");
-    const totalCols = 5;
-    const lastColLetter = String.fromCharCode(64 + totalCols); // E
-
-    const monthObj = new Date(`${month}-01`);
-    const monthName = monthObj
-      .toLocaleString("default", { month: "long" })
-      .toUpperCase();
-    const year = monthObj.getFullYear();
-
-    // Split header into two rows
-    const titleMain = `COMPLIANCE SUMMARY ${monthName} ${year}`;
-    const titleDetails = `Assignment Ratio by Insurer, Department, Classification`;
-
-    sheet.addRow([titleMain]);
-    sheet.mergeCells(`A1:${lastColLetter}1`);
-    const titleRow = sheet.getRow(1);
-    titleRow.height = 28;
-    titleRow.getCell(1).font = { name: "Tahoma", size: 13, bold: true };
-    titleRow.getCell(1).alignment = {
-      vertical: "middle",
-      horizontal: "center",
-      wrapText: true,
-    };
-    titleRow.getCell(1).fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FF92D050" },
-    };
-
-    sheet.addRow([titleDetails]);
-    sheet.mergeCells(`A2:${lastColLetter}2`);
-    const detailsRow = sheet.getRow(2);
-    detailsRow.height = 22;
-    detailsRow.getCell(1).font = { name: "Tahoma", size: 11, bold: false };
-    detailsRow.getCell(1).alignment = {
-      vertical: "middle",
-      horizontal: "center",
-      wrapText: true,
-    };
-    detailsRow.getCell(1).fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FFEDEDED" },
-    };
-
-    // --- Header row ---
-    const headerValues = [
-      "INSURER",
-      "COMPLIED",
-      "NOT COMPLIED",
-      "TOTAL",
-      "COMPLIED (%)",
-    ];
-    sheet.addRow(headerValues);
-    const headerRow = sheet.getRow(3);
-    headerRow.height = 20;
-    headerRow.eachCell((cell) => {
-      cell.font = {
-        name: "Tahoma",
-        size: 11,
-        bold: true,
-        color: { argb: "FF000000" },
-      };
-      cell.alignment = {
-        vertical: "middle",
-        horizontal: "center",
-        wrapText: true,
-      };
-      cell.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FFEDEDED" },
-      };
-      cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
-      };
-      cell.value = String(cell.value).toUpperCase();
-    });
-
-    let rowIdx = 4;
-
-    // --- Data logic ---
     // Get all closed files for the month
-    const files = await Casefile.findAll({
+    const files = await db.casefiles.findAll({
       where: {
-        fileStatus: { [Op.in]: ["CLO", "CLOSED"] },
-        dateClosed: { [Op.between]: [startDate, endDate] },
+        fileStatus: { [db.Sequelize.Op.in]: ["CLO", "CLOSED"] },
+        dateClosed: { [db.Sequelize.Op.between]: [startDate, endDate] },
+        ...(deptId && deptId !== "all" && { refType: deptId }),
+        ...(classificationId &&
+          classificationId !== "all" && { subRefType: classificationId }),
       },
       attributes: [
         "insurer",
@@ -259,8 +181,6 @@ exports.exportComplianceRatioInsurerDept = async (req, res) => {
 
     // Filter insurers to those present in files
     let insurerIds = Array.from(new Set(files.map((f) => String(f.insurer))));
-
-    // Sort insurerIds by code (or name if code missing)
     insurerIds = insurerIds.sort((a, b) => {
       const aLabel = (
         insurerMap[a]?.code ||
@@ -275,13 +195,41 @@ exports.exportComplianceRatioInsurerDept = async (req, res) => {
       return aLabel.localeCompare(bLabel);
     });
 
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Sheet1");
+
+    // Add merged title row
+    const titleText = "COMPLIANCE RATIO BY INSURER - BASED ON CLOSED FILES";
+    sheet.addRow([titleText, "", "", "", ""]);
+    sheet.mergeCells("A1:E1");
+    const titleRow = sheet.getRow(1);
+    titleRow.height = 32;
+    titleRow.getCell(1).font = { name: "Tahoma", size: 14, bold: true };
+    titleRow.getCell(1).alignment = {
+      vertical: "middle",
+      horizontal: "center",
+    };
+
+    // Add header row with minimal formatting
+    const headerRow = sheet.addRow([
+      "INSURER",
+      "COMPLIED",
+      "NOT COMPLIED",
+      "TOTAL",
+      "COMPLIED (%)",
+    ]);
+    headerRow.eachCell((cell) => {
+      cell.font = { name: "Tahoma", size: 12, bold: true };
+      cell.alignment = { vertical: "middle", horizontal: "center" };
+    });
+
     for (const insurerId of insurerIds) {
       const insInfo = insurerMap[insurerId] || {
         name: "Unknown",
         code: insurerId,
       };
 
-      // 1. Summary row for insurer (all dept/class)
+      // Summary row for insurer (all dept/class)
       const filesIns = files.filter((f) => String(f.insurer) === insurerId);
       let complied = 0,
         notComplied = 0,
@@ -309,140 +257,80 @@ exports.exportComplianceRatioInsurerDept = async (req, res) => {
         }
         total += 1;
       });
-      const percent =
-        total > 0 ? ((complied / total) * 100).toFixed(2) : "0.00";
-      sheet.addRow([
-        (insInfo.code || insInfo.name).toUpperCase(),
+      const dataRow = sheet.addRow([
+        String(insInfo.code || insInfo.name).toUpperCase(),
         complied,
         notComplied,
         total,
-        percent,
+        total > 0 ? ((complied / total) * 100).toFixed(2) : "0.00",
       ]);
-      const dataRow = sheet.getRow(rowIdx++);
-      dataRow.height = 18;
-      dataRow.getCell(1).font = { name: "Tahoma", size: 11, bold: true };
-      dataRow.getCell(1).alignment = { vertical: "middle", horizontal: "left" }; // left align insurer
-      for (let col = 2; col <= totalCols; col++) {
-        dataRow.getCell(col).font = { name: "Tahoma", size: 11, bold: true };
+      dataRow.getCell(1).font = { name: "Tahoma", size: 12, bold: true };
+      dataRow.getCell(1).alignment = { vertical: "middle", horizontal: "left" };
+      for (let col = 2; col <= 5; col++) {
+        dataRow.getCell(col).font = { name: "Tahoma", size: 12, bold: true };
         dataRow.getCell(col).alignment = {
           vertical: "middle",
           horizontal: "center",
         };
       }
-      dataRow.getCell(3).font = {
-        name: "Tahoma",
-        size: 11,
-        bold: true,
-        color: { argb: "FFFF0000" },
-      };
-      dataRow.eachCell((cell, colNumber) => {
-        cell.border = {
-          top: { style: "thin" },
-          left: { style: "thin" },
-          bottom: { style: "thin" },
-          right: { style: "thin" },
-        };
-      });
 
-      // 2. For each department/classification
-      let deptFilterIds = [];
-      if (!deptId || deptId === "all") {
-        deptFilterIds = Array.from(
-          new Set(filesIns.map((f) => String(f.refType)))
+      // Loop through all file classifications for this insurer
+      const classIds = Array.from(
+        new Set(filesIns.map((f) => String(f.subRefType)))
+      );
+      for (const classId of classIds) {
+        const classFiles = filesIns.filter(
+          (f) => String(f.subRefType) === classId
         );
-      } else {
-        deptFilterIds = [String(deptId)];
-      }
-
-      for (const dId of deptFilterIds) {
-        const deptFiles = filesIns.filter((f) => String(f.refType) === dId);
-        let classFilterIds = [];
-        if (!classificationId || classificationId === "all") {
-          classFilterIds = Array.from(
-            new Set(deptFiles.map((f) => String(f.subRefType)))
-          );
-        } else {
-          classFilterIds = [String(classificationId)];
-        }
-
-        for (const cId of classFilterIds) {
-          const classFiles = deptFiles.filter(
-            (f) => String(f.subRefType) === cId
-          );
-          let compliedC = 0,
-            notCompliedC = 0,
-            totalC = 0;
-          classFiles.forEach((file) => {
-            const tatKey = `${insurerId}-${String(file.subRefType)}`;
-            const tatDays = tatMap.hasOwnProperty(tatKey)
-              ? tatMap[tatKey]
-              : null;
-            let days = 0;
-            if (file.dateOfAssign && file.dateClosed) {
-              days = Math.abs(
-                Math.floor(
-                  (new Date(file.dateClosed) - new Date(file.dateOfAssign)) /
-                    (1000 * 60 * 60 * 24)
-                )
-              );
-            }
-            if (
-              tatDays === null ||
-              typeof tatDays === "undefined" ||
-              days <= tatDays
-            ) {
-              compliedC += 1;
-            } else {
-              notCompliedC += 1;
-            }
-            totalC += 1;
-          });
-          const percentC =
-            totalC > 0 ? ((compliedC / totalC) * 100).toFixed(2) : "0.00";
-          // Label: Allianz (TPBI/BI)
-          const label = `${(insInfo.code || insInfo.name).toUpperCase()} (${
-            deptMap[dId] || dId
-          }/${subDeptMap[cId] || cId})`;
-          sheet.addRow([label, compliedC, notCompliedC, totalC, percentC]);
-          const classRow = sheet.getRow(rowIdx++);
-          classRow.height = 18;
-          classRow.getCell(1).font = { name: "Tahoma", size: 11, bold: false };
-          classRow.getCell(1).alignment = {
-            vertical: "middle",
-            horizontal: "left",
-          }; // left align insurer
-          for (let col = 2; col <= totalCols; col++) {
-            classRow.getCell(col).font = {
-              name: "Tahoma",
-              size: 11,
-              bold: true,
-            };
-            classRow.getCell(col).alignment = {
-              vertical: "middle",
-              horizontal: "center",
-            };
+        let compliedC = 0,
+          notCompliedC = 0,
+          totalC = 0;
+        classFiles.forEach((file) => {
+          const tatKey = `${insurerId}-${String(file.subRefType)}`;
+          const tatDays = tatMap.hasOwnProperty(tatKey) ? tatMap[tatKey] : null;
+          let days = 0;
+          if (file.dateOfAssign && file.dateClosed) {
+            days = Math.abs(
+              Math.floor(
+                (new Date(file.dateClosed) - new Date(file.dateOfAssign)) /
+                  (1000 * 60 * 60 * 24)
+              )
+            );
           }
-          classRow.getCell(3).font = {
-            name: "Tahoma",
-            size: 11,
-            bold: true,
-            color: { argb: "FFFF0000" },
+          if (
+            tatDays === null ||
+            typeof tatDays === "undefined" ||
+            days <= tatDays
+          ) {
+            compliedC += 1;
+          } else {
+            notCompliedC += 1;
+          }
+          totalC += 1;
+        });
+        const className = subDeptMap[classId] || classId;
+        const classRow = sheet.addRow([
+          `${String(
+            insInfo.code || insInfo.name
+          ).toUpperCase()} (${className})`,
+          compliedC,
+          notCompliedC,
+          totalC,
+          totalC > 0 ? ((compliedC / totalC) * 100).toFixed(2) : "0.00",
+        ]);
+        classRow.getCell(1).font = { name: "Tahoma", size: 12, bold: false };
+        classRow.getCell(1).alignment = {
+          vertical: "middle",
+          horizontal: "left",
+        };
+        for (let col = 2; col <= 5; col++) {
+          classRow.getCell(col).font = { name: "Tahoma", size: 12, bold: true };
+          classRow.getCell(col).alignment = {
+            vertical: "middle",
+            horizontal: "center",
           };
-          classRow.eachCell((cell, colNumber) => {
-            cell.border = {
-              top: { style: "thin" },
-              left: { style: "thin" },
-              bottom: { style: "thin" },
-              right: { style: "thin" },
-            };
-          });
         }
       }
-    }
-
-    // --- Set column widths ---
-    for (let i = 1; i <= totalCols; i++) {
-      sheet.getColumn(i).width = i === 1 ? 28 : 18;
     }
 
     res.setHeader(
@@ -451,7 +339,7 @@ exports.exportComplianceRatioInsurerDept = async (req, res) => {
     );
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename=ComplianceRatio_InsurerDept_${month}.xlsx`
+      "attachment; filename=ComplianceRatio_InsurerDept_OK.xlsx"
     );
     await workbook.xlsx.write(res);
     res.end();
