@@ -491,21 +491,25 @@ const resetPassword = (req, res) => {
 // Set default timezone for moment
 moment.tz.setDefault("Asia/Kuala_Lumpur");
 
-// Modify the cron schedule to explicitly use Malaysia timezone
-cron.schedule(
-  "1 0 * * *",
-  () => {
-    console.log(
-      "Running scheduled TAT alert check...",
-      moment().format("YYYY-MM-DD HH:mm:ss")
-    );
-    sendTatAlerts();
-  },
-  {
-    scheduled: true,
-    timezone: "Asia/Kuala_Lumpur",
-  }
-);
+// Only schedule TAT alerts in production
+if (process.env.NODE_ENV === "production") {
+  cron.schedule(
+    "1 0 * * *",
+    () => {
+      console.log(
+        "Running scheduled TAT alert check...",
+        moment().format("YYYY-MM-DD HH:mm:ss")
+      );
+      sendTatAlerts();
+    },
+    {
+      scheduled: true,
+      timezone: "Asia/Kuala_Lumpur",
+    }
+  );
+} else {
+  console.log("TAT alert scheduler disabled in development mode");
+}
 
 const sendTatAlerts = async (isTest = false) => {
   try {
