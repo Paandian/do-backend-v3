@@ -207,29 +207,64 @@ exports.findPaginated = async (req, res) => {
         horizontal: "center",
       };
 
-      // --- Cosmetic: Number of files ---
+      // --- Cosmetic: Number of files (dynamic count) ---
       worksheet.mergeCells("A2:S2");
-      worksheet.getCell("A2").value = `Number of Files: ${rows.length}`;
+      worksheet.getCell("A2").value = {
+        formula: `SUBTOTAL(3,B6:B${rows.length + 5})`,
+      };
       worksheet.getCell("A2").font = { size: 12, bold: true };
       worksheet.getCell("A2").alignment = {
         vertical: "middle",
         horizontal: "center",
       };
 
-      // --- Cosmetic: Filtered by (show display names) ---
+      // --- Cosmetic: Filtered by (show display names, especially for date fields) ---
       worksheet.mergeCells("A3:S3");
       worksheet.getCell("A3").value =
         "Filtered by: " +
-        (Object.entries(req.query)
-          .filter(
-            ([k, v]) => v && k !== "export" && k !== "page" && k !== "pageSize"
-          )
-          .map(([k, v]) => {
-            const display = getFilterDisplay(k, v, meta);
-            return display ? `${k}: ${display}` : "";
-          })
-          .filter(Boolean)
-          .join(", ") || "None");
+        (() => {
+          // Collect filter display strings
+          const filterDisplays = [];
+          // Handle date range specially
+          const dateFieldMap = {
+            dateOfAssign: "Date Of Assignment",
+            dateClosed: "Date Closed",
+            dateOfCancel: "Date Canceled",
+            dateFinal: "Finalisation Date",
+          };
+          const dateBy = req.query.dateBy || "dateOfAssign";
+          if (req.query.startDate || req.query.endDate) {
+            const label = dateFieldMap[dateBy] || dateBy;
+            let start = req.query.startDate
+              ? new Date(req.query.startDate).toLocaleDateString("en-GB")
+              : "";
+            let end = req.query.endDate
+              ? new Date(req.query.endDate).toLocaleDateString("en-GB")
+              : "";
+            filterDisplays.push(
+              `${label} FROM: ${start || "-"} TO: ${end || "-"}`
+            );
+          }
+          // Other filters
+          Object.entries(req.query)
+            .filter(
+              ([k, v]) =>
+                v &&
+                k !== "export" &&
+                k !== "page" &&
+                k !== "pageSize" &&
+                k !== "dateBy" &&
+                k !== "startDate" &&
+                k !== "endDate"
+            )
+            .forEach(([k, v]) => {
+              const display = getFilterDisplay(k, v, meta);
+              if (display) {
+                filterDisplays.push(`${getFilterLabel(k)}: ${display}`);
+              }
+            });
+          return filterDisplays.length ? filterDisplays.join(" | ") : "None";
+        })();
       worksheet.getCell("A3").font = { size: 11, italic: true };
       worksheet.getCell("A3").alignment = {
         vertical: "middle",
@@ -273,10 +308,20 @@ exports.findPaginated = async (req, res) => {
       // --- Table header row ---
       worksheet.addRow(worksheet.columns.map((col) => col.header));
 
+      // --- Make header row filterable ---
+      worksheet.autoFilter = {
+        from: "A5",
+        to: String.fromCharCode(65 + worksheet.columns.length - 1) + "5",
+      };
+
       // --- Table rows ---
       rows.forEach((row, idx) => {
+        const excelRowNum = idx + 6;
         worksheet.addRow([
-          idx + 1,
+          {
+            formula: `SUBTOTAL(3,$B$6:B${excelRowNum})`,
+            alignment: { vertical: "middle", horizontal: "center" },
+          },
           getNameById(meta.handlers, row.handler) ||
             getUsernameById(meta.users, row.handler),
           row.claimNo || "",
@@ -319,7 +364,7 @@ exports.findPaginated = async (req, res) => {
       const headerRow = worksheet.getRow(5);
       headerRow.font = { bold: true };
       headerRow.alignment = { vertical: "middle", horizontal: "center" };
-      headerRow.eachCell((cell) => {
+      headerRow.eachCell((cell, colNumber) => {
         cell.fill = {
           type: "pattern",
           pattern: "solid",
@@ -337,6 +382,11 @@ exports.findPaginated = async (req, res) => {
         if (rowNumber > 5) {
           row.font = { bold: false };
           row.alignment = { vertical: "middle", horizontal: "left" };
+          // Center align NO. column data
+          row.getCell(1).alignment = {
+            vertical: "middle",
+            horizontal: "center",
+          };
           row.eachCell((cell) => {
             cell.border = {
               top: { style: "thin" },
@@ -441,17 +491,40 @@ function buildFilters(query) {
   if (query.subRefType) where.subRefType = query.subRefType;
   if (query.adjuster) where.adjuster = query.adjuster;
   if (query.vehicleNo) where.vehicleNo = { [Op.like]: `%${query.vehicleNo}%` };
+  // Dynamic date filtering
+  const dateField = query.dateBy || "dateOfAssign";
   if (query.startDate && query.endDate) {
-    where.dateOfAssign = {
+    where[dateField] = {
       [Op.between]: [query.startDate, query.endDate],
     };
   } else if (query.startDate) {
-    where.dateOfAssign = { [Op.gte]: query.startDate };
+    where[dateField] = { [Op.gte]: query.startDate };
   } else if (query.endDate) {
-    where.dateOfAssign = { [Op.lte]: query.endDate };
+    where[dateField] = { [Op.lte]: query.endDate };
   }
   if (query.id) where.id = query.id;
-  if (query.fileStatus) where.fileStatus = query.fileStatus;
+  // Support multiple fileStatus values
+  if (query.fileStatus) {
+    if (Array.isArray(query.fileStatus)) {
+      where.fileStatus = { [Op.in]: query.fileStatus };
+    } else if (
+      typeof query.fileStatus === "string" &&
+      query.fileStatus.startsWith("[") &&
+      query.fileStatus.endsWith("]")
+    ) {
+      // Handle JSON stringified array from frontend
+      try {
+        const arr = JSON.parse(query.fileStatus);
+        if (Array.isArray(arr)) {
+          where.fileStatus = { [Op.in]: arr };
+        }
+      } catch (e) {
+        where.fileStatus = query.fileStatus;
+      }
+    } else {
+      where.fileStatus = query.fileStatus;
+    }
+  }
   return where;
 }
 
@@ -663,3 +736,27 @@ exports.delete = (req, res) => {
 //       });
 //     });
 // };
+
+// Helper: get display label for filter keys
+function getFilterLabel(key) {
+  switch (key) {
+    case "insurer":
+      return "Insurer Name";
+    case "branch":
+      return "Branch";
+    case "refType":
+      return "Department";
+    case "subRefType":
+      return "File Classification";
+    case "adjuster":
+      return "Adjuster";
+    case "vehicleNo":
+      return "Vehicle No";
+    case "id":
+      return "AASB Ref";
+    case "fileStatus":
+      return "Status";
+    default:
+      return key;
+  }
+}
