@@ -194,38 +194,34 @@ exports.findPaginated = async (req, res) => {
 
       const meta = await getMetaData();
 
+      // --- FIX: define dateStr and totalFiles ---
+      const reportDate = new Date();
+      const dateStr = reportDate.toLocaleDateString("en-GB");
+      const totalFiles = rows.length;
+
       // Create Excel workbook and worksheet
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("File Report");
 
-      // --- Cosmetic: Title ---
+      // --- Title row ---
       worksheet.mergeCells("A1:S1");
-      worksheet.getCell("A1").value = "AASB File Report";
-      worksheet.getCell("A1").font = { size: 16, bold: true };
+      worksheet.getCell("A1").value = {
+        formula: `="AASB FILE REPORT | " & TEXT(TODAY(),"DD/MM/YYYY") & " | TOTAL: " & SUBTOTAL(3,B5:B${
+          rows.length + 4
+        })`,
+      };
+      worksheet.getCell("A1").font = { name: "Calibri", size: 16, bold: true };
       worksheet.getCell("A1").alignment = {
         vertical: "middle",
-        horizontal: "center",
+        horizontal: "left",
       };
 
-      // --- Cosmetic: Number of files (dynamic count) ---
+      // --- Filtered by row ---
       worksheet.mergeCells("A2:S2");
-      worksheet.getCell("A2").value = {
-        formula: `SUBTOTAL(3,B6:B${rows.length + 5})`,
-      };
-      worksheet.getCell("A2").font = { size: 12, bold: true };
-      worksheet.getCell("A2").alignment = {
-        vertical: "middle",
-        horizontal: "center",
-      };
-
-      // --- Cosmetic: Filtered by (show display names, especially for date fields) ---
-      worksheet.mergeCells("A3:S3");
-      worksheet.getCell("A3").value =
-        "Filtered by: " +
+      worksheet.getCell("A2").value =
+        "FILTERED BY: " +
         (() => {
-          // Collect filter display strings
           const filterDisplays = [];
-          // Handle date range specially
           const dateFieldMap = {
             dateOfAssign: "Date Of Assignment",
             dateClosed: "Date Closed",
@@ -245,7 +241,6 @@ exports.findPaginated = async (req, res) => {
               `${label} FROM: ${start || "-"} TO: ${end || "-"}`
             );
           }
-          // Other filters
           Object.entries(req.query)
             .filter(
               ([k, v]) =>
@@ -265,61 +260,75 @@ exports.findPaginated = async (req, res) => {
             });
           return filterDisplays.length ? filterDisplays.join(" | ") : "None";
         })();
-      worksheet.getCell("A3").font = { size: 11, italic: true };
-      worksheet.getCell("A3").alignment = {
+      worksheet.getCell("A2").font = {
+        name: "Calibri",
+        size: 11,
+        italic: true,
+      };
+      worksheet.getCell("A2").alignment = {
         vertical: "middle",
-        horizontal: "center",
+        horizontal: "left",
       };
 
-      // --- Cosmetic: Blank row before table ---
+      // --- Blank row before table ---
       worksheet.addRow([]);
 
-      // --- Table header: add NO. column first ---
-      worksheet.columns = [
-        { header: "NO.", key: "numbering", width: 7 },
-        { header: "CLAIMS HANDLER", key: "handler", width: 22 },
-        { header: "INSURER'S REF", key: "claimNo", width: 18 },
-        { header: "INSURED NAME", key: "insuredName", width: 22 },
-        { header: "VEHICLE NO", key: "vehicleNo", width: 18 },
-        { header: "INSURER", key: "insurer", width: 22 },
-        { header: "CLAIM TYPE", key: "claimType", width: 18 },
-        { header: "BRANCH", key: "branch", width: 18 },
-        { header: "DEPARTMENT", key: "department", width: 18 },
-        { header: "FILE CLASSIFICATION", key: "fileClassification", width: 22 },
-        { header: "ADJUSTER", key: "adjuster", width: 18 },
-        { header: "AASB REF", key: "aasbRef", width: 24 },
-        { header: "DATE OF ASSIGNMENT", key: "dateOfAssign", width: 18 },
-        { header: "DATE OF LOSS", key: "dateOfLoss", width: 18 },
-        { header: "DAYS", key: "days", width: 10 },
-        {
-          header: "ADJUSTER ACKNOWLEDMENT DATE",
-          key: "dateStartInv",
-          width: 22,
-        },
-        { header: "REPORT SUBMISSION DATE", key: "dateEndInv", width: 22 },
-        { header: "STATUS", key: "fileStatus", width: 18 },
-        {
-          header: "TOTAL AMOUNT OF ALL TAX INVOICES",
-          key: "invTotal",
-          width: 22,
-        },
+      // --- Table header row (Row 4) ---
+      const headerColumns = [
+        "NO.",
+        "CLAIMS HANDLER",
+        "INSURER'S REF",
+        "INSURED NAME",
+        "VEHICLE NO",
+        "INSURER",
+        "CLAIM TYPE",
+        "BRANCH",
+        "DEPARTMENT",
+        "FILE CLASSIFICATION",
+        "ADJUSTER",
+        "AASB REF",
+        "DATE OF ASSIGNMENT",
+        "DATE OF LOSS",
+        "DAYS",
+        "ADJUSTER ACKNOWLEDMENT DATE",
+        "REPORT SUBMISSION DATE",
+        "STATUS",
+        "INVOICE AMOUNT",
       ];
+      worksheet.addRow(headerColumns);
 
-      // --- Table header row ---
-      worksheet.addRow(worksheet.columns.map((col) => col.header));
+      // Style header row (Row 4)
+      const headerRow = worksheet.getRow(4);
+      headerRow.font = { name: "Calibri", size: 11, bold: true };
+      headerRow.alignment = { vertical: "middle", horizontal: "center" };
+      headerRow.eachCell((cell) => {
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFDDEEFF" },
+        };
+        cell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+        cell.value = String(cell.value).toUpperCase();
+      });
 
       // --- Make header row filterable ---
       worksheet.autoFilter = {
-        from: "A5",
-        to: String.fromCharCode(65 + worksheet.columns.length - 1) + "5",
+        from: "A4",
+        to: "S4",
       };
 
-      // --- Table rows ---
+      // --- Data rows (Row 5 onwards) ---
       rows.forEach((row, idx) => {
-        const excelRowNum = idx + 6;
+        const excelRowNum = idx + 5;
         worksheet.addRow([
+          // NO. column: renumbered after filtering
           {
-            formula: `SUBTOTAL(3,$B$6:B${excelRowNum})`,
+            formula: `SUBTOTAL(3,$B$5:B${excelRowNum})`,
             alignment: { vertical: "middle", horizontal: "center" },
           },
           getNameById(meta.handlers, row.handler) ||
@@ -360,27 +369,10 @@ exports.findPaginated = async (req, res) => {
         ]);
       });
 
-      // --- Cosmetic: Style header row only ---
-      const headerRow = worksheet.getRow(5);
-      headerRow.font = { bold: true };
-      headerRow.alignment = { vertical: "middle", horizontal: "center" };
-      headerRow.eachCell((cell, colNumber) => {
-        cell.fill = {
-          type: "pattern",
-          pattern: "solid",
-          fgColor: { argb: "FFDDEEFF" },
-        };
-        cell.border = {
-          top: { style: "thin" },
-          left: { style: "thin" },
-          bottom: { style: "thin" },
-          right: { style: "thin" },
-        };
-      });
-
+      // Style data rows (Row 5 onwards)
       worksheet.eachRow((row, rowNumber) => {
-        if (rowNumber > 5) {
-          row.font = { bold: false };
+        if (rowNumber >= 5) {
+          row.font = { name: "Calibri", size: 11 };
           row.alignment = { vertical: "middle", horizontal: "left" };
           // Center align NO. column data
           row.getCell(1).alignment = {
@@ -398,7 +390,7 @@ exports.findPaginated = async (req, res) => {
         }
       });
 
-      worksheet.views = [{ state: "frozen", ySplit: 5 }];
+      worksheet.views = [{ state: "frozen", ySplit: 4 }];
 
       res.setHeader(
         "Content-Type",
@@ -406,7 +398,7 @@ exports.findPaginated = async (req, res) => {
       );
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename=Report_${new Date()
+        `attachment; filename=Report_${reportDate
           .toISOString()
           .slice(0, 10)}.xlsx`
       );
@@ -622,38 +614,6 @@ exports.findAll = (req, res) => {
       });
     });
 };
-
-//Retrieve all Casefiles with a refType
-// exports.findAllRefType = (req, res) => {
-//   const refType = req.params.refType;
-//   var condition = refType ? { refType: { [Op.like]: `${refType}` } } : null;
-
-//   Casefile.findAll({ where: condition })
-//     .then((data) => {
-//       res.send(data);
-//     })
-//     .catch((err) => {
-//       res.status(500).send({
-//         message: "Error retrieving Casefile with refType=" + refType,
-//       });
-//     });
-// };
-
-//Retrieve all Casefiles with a branch
-// exports.findAllBranch = (req, res) => {
-//   const branch = req.params.branch;
-//   var condition = branch ? { branch: { [Op.like]: `${branch}` } } : null;
-
-//   Casefile.findAll({ where: condition })
-//     .then((data) => {
-//       res.send(data);
-//     })
-//     .catch((err) => {
-//       res.status(500).send({
-//         message: "Error retrieving Casefile with branch=" + branch,
-//       });
-//     });
-// };
 
 // Find a single Casefile with an id
 exports.findOne = (req, res) => {
