@@ -206,7 +206,7 @@ exports.findPaginated = async (req, res) => {
       // --- Title row ---
       worksheet.mergeCells("A1:S1");
       worksheet.getCell("A1").value = {
-        formula: `="AASB FILE REPORT | " & TEXT(TODAY(),"DD/MM/YYYY") & " | TOTAL: " & SUBTOTAL(3,B5:B${
+        formula: `="AASB FILE REPORT | ${dateStr} | TOTAL: " & SUBTOTAL(3,B5:B${
           rows.length + 4
         })`,
       };
@@ -316,19 +316,22 @@ exports.findPaginated = async (req, res) => {
         cell.value = String(cell.value).toUpperCase();
       });
 
-      // --- Make header row filterable ---
+      // --- Add header row filter ---
       worksheet.autoFilter = {
         from: "A4",
         to: "S4",
       };
 
+      // --- Remove header row filter ---
+      // worksheet.autoFilter = undefined;
+
       // --- Data rows (Row 5 onwards) ---
       rows.forEach((row, idx) => {
         const excelRowNum = idx + 5;
+        // Use IF formula to avoid numbering blank rows after filtering
         worksheet.addRow([
-          // NO. column: renumbered after filtering
           {
-            formula: `SUBTOTAL(3,$B$5:B${excelRowNum})`,
+            formula: `IF(COUNTA(B${excelRowNum}:S${excelRowNum})=0,"",SUBTOTAL(3,$B$5:B${excelRowNum}))`,
             alignment: { vertical: "middle", horizontal: "center" },
           },
           getNameById(meta.handlers, row.handler) ||
