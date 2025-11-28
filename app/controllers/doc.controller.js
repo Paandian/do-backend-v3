@@ -10,8 +10,6 @@ const upload = async (req, res) => {
       return res.status(400).send({ message: "Please upload a file!" });
     }
 
-    // const directoryPath = path.join(__dirname, "../../../docs");
-
     // console.log(res.req.file.filename);
     const uploadedFilename = res.req.file.filename;
     res.status(200).send({

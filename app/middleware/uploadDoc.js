@@ -16,7 +16,6 @@ let storage = multer.diskStorage({
   destination: (req, file, cb) => {
     // cb(null, __basedir + "/resources/static/assets/uploads/");
     cb(null, path.join(__dirname, "../../../docs"));
-    // let destination = path.join(__dirname, "../docs");
 
     // cb(null, "/app/uploads/");
   },
