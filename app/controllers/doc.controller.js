@@ -2,6 +2,15 @@ const uploadFile = require("../middleware/uploadDoc");
 const db = require("../models");
 const fs = require("fs");
 const path = require("path");
+// Load environment variables
+const dotenv = require("dotenv");
+dotenv.config();
+
+const DOCS_PATH =
+  process.env.NODE_ENV === "production"
+    ? process.env.PROD_DOCS_PATH
+    : process.env.DEV_DOCS_PATH;
+
 const Member = db.user;
 const upload = async (req, res) => {
   try {
@@ -30,7 +39,7 @@ const upload = async (req, res) => {
   }
 };
 const getListFiles = (req, res) => {
-  const directoryPath = path.join(__dirname, "../../../docs");
+  const directoryPath = path.resolve(DOCS_PATH);
 
   fs.readdir(directoryPath, function (err, files) {
     if (err) {
@@ -49,7 +58,7 @@ const getListFiles = (req, res) => {
 };
 const download = (req, res) => {
   const fileName = req.params.name;
-  const directoryPath = path.join(__dirname, "../../../docs/");
+  const directoryPath = path.resolve(DOCS_PATH) + path.sep;
   res.download(directoryPath + fileName, fileName, (err) => {
     if (err) {
       res.status(500).send({

@@ -3,6 +3,14 @@ const Document = db.document;
 const Op = db.Sequelize.Op;
 const path = require("path");
 const fs = require("fs");
+// Load environment variables
+const dotenv = require("dotenv");
+dotenv.config();
+
+const DOCS_PATH =
+  process.env.NODE_ENV === "production"
+    ? process.env.PROD_DOCS_PATH
+    : process.env.DEV_DOCS_PATH;
 
 // Create and Save a new Document
 exports.create = (req, res) => {
@@ -85,12 +93,11 @@ exports.update = (req, res) => {
 exports.delete = (req, res) => {
   const id = req.params.id;
   const name = req.params.name;
-  const directoryPath = path.join(__dirname, "../../../docs/" + name);
+  const directoryPath = path.resolve(DOCS_PATH, name);
 
   Document.destroy({
     where: { id: id },
   })
-
     .then((num) => {
       if (num == 1) {
         fs.unlink(directoryPath, (err) => {
@@ -109,15 +116,6 @@ exports.delete = (req, res) => {
       }
     })
 
-    // .then((num) => {
-    //   if (num == 1)
-    //     fs.unlink(directoryPath, (err) => {
-    //       if (err) {
-    //         console.error(err);
-    //         return;
-    //       }
-    //     });
-    // })
     .catch((err) => {
       res.status(500).send({
         message: "Could not delete Document with id=" + id,

@@ -3,6 +3,15 @@ const multer = require("multer");
 const path = require("path");
 const maxSize = 4 * 1024 * 1024;
 
+// Load environment variables
+const dotenv = require("dotenv");
+dotenv.config();
+
+const DOCS_PATH =
+  process.env.NODE_ENV === "production"
+    ? process.env.PROD_DOCS_PATH
+    : process.env.DEV_DOCS_PATH;
+
 //imageFilter added to validate images only
 const imageFilter = (req, file, cb) => {
   if (file.mimetype.startsWith("image")) {
@@ -14,8 +23,7 @@ const imageFilter = (req, file, cb) => {
 
 let storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    // cb(null, __basedir + "/resources/static/assets/uploads/");
-    cb(null, path.join(__dirname, "../../../docs"));
+    cb(null, path.resolve(DOCS_PATH));
 
     // cb(null, "/app/uploads/");
   },

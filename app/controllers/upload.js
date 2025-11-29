@@ -8,11 +8,7 @@ const uploadFiles = async (req, res) => {
       return res.send(`You must select a file.`);
     }
     Image.create({
-      //   type: req.file.mimetype,
       name: req.file.originalname,
-      //   data: fs.readFileSync(
-      //     __basedir + "/app/uploads/" + req.file.filename
-      //   ),
     }).then((image) => {
       fs.writeFileSync(
         __basedir + "/app/tmp/" + image.name

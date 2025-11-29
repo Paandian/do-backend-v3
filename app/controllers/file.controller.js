@@ -2,6 +2,15 @@ const uploadFile = require("../middleware/upload");
 const db = require("../models");
 const fs = require("fs");
 const path = require("path");
+// Load environment variables
+const dotenv = require("dotenv");
+dotenv.config();
+
+const UPLOADS_PATH =
+  process.env.NODE_ENV === "production"
+    ? process.env.PROD_UPLOADS_PATH
+    : process.env.DEV_UPLOADS_PATH;
+
 const Member = db.user;
 const upload = async (req, res) => {
   try {
@@ -24,7 +33,7 @@ const upload = async (req, res) => {
   }
 };
 const getListFiles = (req, res) => {
-  const directoryPath = path.join(__dirname, "../../../uploads");
+  const directoryPath = path.resolve(UPLOADS_PATH);
 
   fs.readdir(directoryPath, function (err, files) {
     if (err) {
