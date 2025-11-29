@@ -723,3 +723,101 @@ function getFilterLabel(key) {
       return key;
   }
 }
+
+// GET /api/casefiles/overdue
+exports.findOverdueCases = async (req, res) => {
+  try {
+    const db = require("../models");
+    const Casefile = db.casefiles;
+    const Op = db.Sequelize.Op;
+    const moment = require("moment");
+
+    // Parse user info from query
+    const { userId, roles, dept, branches } = req.query;
+
+    // Parse TAT chart data from query or fetch from DB
+    let tatCharts = [];
+    if (req.query.tatCharts) {
+      try {
+        tatCharts = JSON.parse(req.query.tatCharts);
+      } catch (e) {
+        tatCharts = [];
+      }
+    } else {
+      tatCharts = await db.tatchart.findAll();
+    }
+
+    // Fetch departments for PIC check
+    const departments = await db.dept.findAll();
+
+    // Build user-based where clause (reuse logic from buildUserWhere)
+    let where = {
+      fileStatus: { [Op.notIn]: ["CLO", "CANC"] },
+      ...buildUserWhere(req.query),
+    };
+
+    // Only fetch relevant fields for performance
+    const cases = await Casefile.findAll({
+      where,
+      attributes: [
+        "id",
+        "refType",
+        "subRefType",
+        "branch",
+        "insurer",
+        "adjuster",
+        "dateOfAssign",
+        "fileStatus",
+      ],
+    });
+
+    // Compute overdue logic
+    const tatAlertCases = [];
+    const tatMaxCases = [];
+    cases.forEach((item) => {
+      // Find TAT values for this case
+      const tat = tatCharts.find(
+        (t) =>
+          String(t.insId) === String(item.insurer) &&
+          String(t.subDeptId) === String(item.subRefType)
+      );
+      if (!tat) return;
+      const tatAlert = parseInt(tat.tatAlert);
+      const tatMax = parseInt(tat.tatMax);
+      const days = moment().diff(moment(item.dateOfAssign), "days");
+
+      // User is responsible if adjuster or department PIC
+      let isUserResponsible = false;
+      if (userId && String(item.adjuster) === String(userId)) {
+        isUserResponsible = true;
+      }
+      // Department PIC logic
+      if (!isUserResponsible && userId && departments && item.refType) {
+        const deptObj = departments.find(
+          (d) => String(d.id) === String(item.refType)
+        );
+        if (deptObj && String(deptObj.picID) === String(userId)) {
+          isUserResponsible = true;
+        }
+      }
+
+      if (isUserResponsible) {
+        if (days >= tatMax) {
+          tatMaxCases.push(item);
+        } else if (days >= tatAlert) {
+          tatAlertCases.push(item);
+        }
+      }
+    });
+
+    res.json({
+      tatAlert: tatAlertCases,
+      tatMax: tatMaxCases,
+    });
+  } catch (err) {
+    console.error("Error in findOverdueCases:", err);
+    res.status(500).json({
+      message: err.message || "Error retrieving overdue cases.",
+    });
+  }
+};

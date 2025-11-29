@@ -36,6 +36,9 @@ module.exports = (app) => {
   // Retrieve all casefiles with branch
   // router.get("/:branch", casefiles.findAllBranch);
 
+  // Retrieve overdue cases for current user (NEW)
+  router.get("/overdue", casefiles.findOverdueCases);
+
   // Retrieve a single casefile with id
   router.get("/:id", casefiles.findOne);
 
@@ -50,4 +53,5 @@ module.exports = (app) => {
 
   // app.use("/api/casefiles", [authJwt.verifyToken], router);
   app.use("/api/casefiles", router);
+  router.get("/overdue-test", (req, res) => res.json({ ok: true }));
 };
