@@ -115,15 +115,16 @@ if (isProd) {
     __dirname,
     process.env.STATIC_PATH || "app/views"
   );
-  // FIX: Remove leading slash from uploads path
   const uploadsPath = path.join(
     __dirname,
     process.env.PROD_UPLOADS_PATH || "uploads"
   );
 
+  // Add this line to log the uploads path
+  console.log("Serving uploads from:", uploadsPath);
+
   app.use(history());
   app.use(express.static(staticPath));
-  // FIX: Serve uploads at /uploads path
   app.use("/uploads", express.static(uploadsPath));
 }
 
