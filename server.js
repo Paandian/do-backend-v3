@@ -115,14 +115,16 @@ if (isProd) {
     __dirname,
     process.env.STATIC_PATH || "app/views"
   );
+  // FIX: Remove leading slash from uploads path
   const uploadsPath = path.join(
     __dirname,
-    process.env.PROD_UPLOADS_PATH || "/uploads"
+    process.env.PROD_UPLOADS_PATH || "uploads"
   );
 
   app.use(history());
   app.use(express.static(staticPath));
-  app.use(express.static(uploadsPath));
+  // FIX: Serve uploads at /uploads path
+  app.use("/uploads", express.static(uploadsPath));
 }
 
 // Development-only middleware (move AFTER API routes)
