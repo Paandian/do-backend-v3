@@ -122,15 +122,8 @@ if (isProd) {
 
   app.use(history());
   app.use(express.static(staticPath));
-  app.use("/uploads", express.static(uploadsPath)); // Serve uploads at /uploads
+  app.use(express.static(uploadsPath));
   console.log("Production mode: Static paths configured");
-} else {
-  // Development: also serve uploads at /uploads
-  const uploadsPath = path.join(
-    __dirname,
-    process.env.UPLOADS_PATH || "../uploads"
-  );
-  app.use("/uploads", express.static(uploadsPath));
 }
 
 // Error handling middleware
