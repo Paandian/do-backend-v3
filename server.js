@@ -117,13 +117,22 @@ if (isProd) {
   );
   const uploadsPath = path.join(
     __dirname,
-    process.env.UPLOADS_PATH || "../uploads"
+    process.env.PROD_UPLOADS_PATH || "../uploads"
   );
 
   app.use(history());
   app.use(express.static(staticPath));
   app.use(express.static(uploadsPath));
-  console.log("Production mode: Static paths configured");
+}
+
+// Development-only middleware (move AFTER API routes)
+if (!isProd) {
+  // Serve uploads statically in development
+  const uploadsPath = path.join(
+    __dirname,
+    process.env.DEV_UPLOADS_PATH || "../uploads"
+  );
+  app.use("/uploads", express.static(uploadsPath));
 }
 
 // Error handling middleware
