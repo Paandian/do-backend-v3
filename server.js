@@ -115,12 +115,12 @@ if (isProd) {
     __dirname,
     process.env.STATIC_PATH || "app/views"
   );
-  const uploadsPath = path.join(
-    __dirname,
-    process.env.PROD_UPLOADS_PATH || "uploads"
-  );
+  // Use absolute path as-is if it starts with /
+  const prodUploadsEnv = process.env.PROD_UPLOADS_PATH || "uploads";
+  const uploadsPath = prodUploadsEnv.startsWith("/")
+    ? prodUploadsEnv
+    : path.join(__dirname, prodUploadsEnv);
 
-  // Add this line to log the uploads path
   console.log("Serving uploads from:", uploadsPath);
 
   app.use(history());
