@@ -117,7 +117,7 @@ if (isProd) {
   );
   const uploadsPath = path.join(
     __dirname,
-    process.env.PROD_UPLOADS_PATH || "../uploads"
+    process.env.PROD_UPLOADS_PATH || "/uploads"
   );
 
   app.use(history());
