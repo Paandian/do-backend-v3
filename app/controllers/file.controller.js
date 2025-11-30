@@ -35,11 +35,24 @@ const upload = async (req, res) => {
 const getListFiles = (req, res) => {
   const directoryPath = path.resolve(UPLOADS_PATH);
 
+  // Check if directory exists
+  if (!fs.existsSync(directoryPath)) {
+    // Option 1: Return empty array
+    return res.status(200).send([]);
+    // Option 2: Return error
+    // return res.status(404).send({ message: "Uploads directory does not exist." });
+  }
+
   fs.readdir(directoryPath, function (err, files) {
     if (err) {
       res.status(500).send({
         message: "Unable to scan files!",
       });
+      return;
+    }
+    if (!files) {
+      // Defensive: if files is undefined/null, return empty array
+      return res.status(200).send([]);
     }
     let fileInfos = [];
     files.forEach((file) => {

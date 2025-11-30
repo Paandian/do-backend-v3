@@ -145,7 +145,7 @@ const branch = (req, res) => {
 
   <h3>Details</h3>
     <ul>
-    <li>Vehicle Number: ${req.body.vehicleNo || "TBA"}</li>
+    <li>Vehicle Number: ${(req.body.vehicleNo || "TBA").toUpperCase()}</li>
     <li>Ref Number: AA/${req.body.refTypeCode}/${req.body.subRefCode}/${
     req.body.id
   }/${req.body.branchCode}</li>
@@ -197,7 +197,7 @@ const adjuster = (req, res) => {
   
     <h3>Details</h3>
       <ul>
-      <li>Vehicle Number: ${req.body.vehicleNo || "TBA"}</li>
+      <li>Vehicle Number: ${(req.body.vehicleNo || "TBA").toUpperCase()}</li>
       <li>Ref Number: AA/${req.body.refTypeCode}/${req.body.subRefCode}/${
     req.body.id
   }/${req.body.branchCode}</li>
@@ -249,7 +249,7 @@ const editor = (req, res) => {
   
     <h3>Details</h3>
       <ul>
-      <li>Vehicle Number: ${req.body.vehicleNo || "TBA"}</li>
+      <li>Vehicle Number: ${(req.body.vehicleNo || "TBA").toUpperCase()}</li>
       <li>Ref Number: AA/${req.body.refTypeCode}/${req.body.subRefCode}/${
     req.body.id
   }/${req.body.branchCode}</li>
@@ -303,7 +303,7 @@ const editorAccept = (req, res) => {
   
     <h3>Details</h3>
       <ul>
-      <li>Vehicle Number: ${req.body.vehicleNo || "TBA"}</li>
+      <li>Vehicle Number: ${(req.body.vehicleNo || "TBA").toUpperCase()}</li>
       <li>Ref Number: AA/${req.body.refTypeCode}/${req.body.subRefCode}/${
     req.body.id
   }/${req.body.branchCode}</li>
@@ -355,7 +355,7 @@ const managerApproval = (req, res) => {
   
     <h3>Details</h3>
       <ul>
-      <li>Vehicle Number: ${req.body.vehicleNo || "TBA"}</li>
+      <li>Vehicle Number: ${(req.body.vehicleNo || "TBA").toUpperCase()}</li>
       <li>Ref Number: AA/${req.body.refTypeCode}/${req.body.subRefCode}/${
     req.body.id
   }/${req.body.branchCode}</li>
@@ -409,7 +409,7 @@ const assignClerk = (req, res) => {
   
     <h3>Details</h3>
       <ul>
-      <li>Vehicle Number: ${req.body.vehicleNo || "TBA"}</li>
+      <li>Vehicle Number: ${(req.body.vehicleNo || "TBA").toUpperCase()}</li>
       <li>Ref Number: AA/${req.body.refTypeCode}/${req.body.subRefCode}/${
     req.body.id
   }/${req.body.branchCode}</li>
