@@ -24,8 +24,6 @@ const imageFilter = (req, file, cb) => {
 let storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, path.resolve(DOCS_PATH));
-
-    // cb(null, "/app/uploads/");
   },
   filename: (req, file, cb) => {
     // console.log(file.originalname);
