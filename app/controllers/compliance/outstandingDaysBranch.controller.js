@@ -1,47 +1,71 @@
 const db = require("../../models");
 const ExcelJS = require("exceljs");
+const Op = db.Sequelize.Op;
 
 // Outstanding Assignment by Days (Branch) - API
 exports.getOutstandingDaysBranch = async (req, res) => {
   try {
-    const { month, deptId } = req.query;
+    const { month, deptId, classificationId } = req.query;
     if (!month) return res.status(400).json({ message: "Month is required" });
 
     const endDate = `${month}-31`;
 
     // Get all branches
-    const branches = await db.branch.findAll({ attributes: ["id", "name"] });
+    const branches = await db.branch.findAll({
+      attributes: ["id", "name", "brCode"], // changed from branchCode to brCode
+    });
     const branchMap = {};
     branches.forEach((b) => {
-      branchMap[String(b.id)] = b.name;
+      branchMap[String(b.id)] = { name: b.name, code: b.brCode || b.name }; // changed from branchCode to brCode
+    });
+
+    // Get all departments and classifications
+    const depts = await db.dept.findAll({ attributes: ["id", "name"] });
+    const deptMap = {};
+    depts.forEach((d) => {
+      deptMap[String(d.id)] = d.name;
+    });
+
+    const subDepts = await db.subDept.findAll({
+      attributes: ["id", "subCode"],
+    });
+    const subDeptMap = {};
+    subDepts.forEach((sd) => {
+      subDeptMap[String(sd.id)] = sd.subCode;
     });
 
     // Build where clause for outstanding files
     const where = {
-      fileStatus: { [db.Sequelize.Op.notIn]: ["CLO", "CLOSED", "CANC"] },
-      dateOfAssign: { [db.Sequelize.Op.lte]: endDate },
+      fileStatus: { [Op.notIn]: ["CLO", "CLOSED", "CANC"] },
+      dateOfAssign: { [Op.lte]: endDate },
       ...(deptId && deptId !== "all" && { refType: deptId }),
+      ...(classificationId &&
+        classificationId !== "all" && { subRefType: classificationId }),
     };
 
     // Get all outstanding (not closed) files assigned at any time, not closed as of end of month
     const files = await db.casefiles.findAll({
       where,
-      attributes: ["branch", "dateOfAssign", "id"],
+      attributes: ["branch", "refType", "subRefType", "dateOfAssign", "id"],
     });
 
-    const buckets = {};
+    // Grouping logic
+    const result = {};
     files.forEach((file) => {
-      const branchName = branchMap[file.branch] || "Unknown";
-      if (!buckets[branchName]) {
-        buckets[branchName] = {
-          below30: 0,
-          above30: 0,
-          above45: 0,
-          above60: 0,
-          above90: 0,
-          total: 0,
+      const branchId = String(file.branch);
+      if (!result[branchId])
+        result[branchId] = {
+          summary: {
+            below30: 0,
+            above30: 0,
+            above45: 0,
+            above60: 0,
+            above90: 0,
+            total: 0,
+          },
+          details: {},
         };
-      }
+
       let days = 0;
       if (file.dateOfAssign) {
         days = Math.abs(
@@ -51,21 +75,46 @@ exports.getOutstandingDaysBranch = async (req, res) => {
           )
         );
       }
-      if (days < 30) buckets[branchName].below30 += 1;
-      if (days >= 30 && days < 45) buckets[branchName].above30 += 1;
-      if (days >= 45 && days < 60) buckets[branchName].above45 += 1;
-      if (days >= 60 && days < 90) buckets[branchName].above60 += 1;
-      if (days >= 90) buckets[branchName].above90 += 1;
-      buckets[branchName].total += 1;
+      let bucket = "";
+      if (days < 30) bucket = "below30";
+      else if (days >= 30 && days < 45) bucket = "above30";
+      else if (days >= 45 && days < 60) bucket = "above45";
+      else if (days >= 60 && days < 90) bucket = "above60";
+      else if (days >= 90) bucket = "above90";
+
+      // Summary
+      result[branchId].summary[bucket] += 1;
+      result[branchId].summary.total += 1;
+
+      // Details by dept/classification
+      const deptKey = String(file.refType || "");
+      const classKey = String(file.subRefType || "");
+      const detailKey = `${deptKey}-${classKey}`;
+      if (!result[branchId].details[detailKey]) {
+        result[branchId].details[detailKey] = {
+          dept: deptMap[deptKey] || deptKey,
+          class: subDeptMap[classKey] || classKey,
+          below30: 0,
+          above30: 0,
+          above45: 0,
+          above60: 0,
+          above90: 0,
+          total: 0,
+        };
+      }
+      result[branchId].details[detailKey][bucket] += 1;
+      result[branchId].details[detailKey].total += 1;
     });
 
-    const reportData = Object.entries(buckets).map(([branch, counts]) => ({
-      branch,
-      ...counts,
-    }));
-
-    // Sort branches alphabetically
-    reportData.sort((a, b) => a.branch.localeCompare(b.branch));
+    // Prepare reportData
+    const reportData = Object.entries(result)
+      .map(([branchId, data]) => ({
+        branch: branchMap[branchId]?.name || "Unknown",
+        branchCode: branchMap[branchId]?.code || branchId,
+        ...data.summary,
+        details: Object.values(data.details),
+      }))
+      .sort((a, b) => a.branchCode.localeCompare(b.branchCode));
 
     // Totals
     const totals = {
@@ -87,6 +136,7 @@ exports.getOutstandingDaysBranch = async (req, res) => {
 
     res.json({ reportData, totals });
   } catch (err) {
+    console.error(err); // Add this line for debugging
     res.status(500).json({ message: err.message });
   }
 };
@@ -94,50 +144,67 @@ exports.getOutstandingDaysBranch = async (req, res) => {
 // Outstanding Assignment by Days (Branch) - Excel Export
 exports.exportOutstandingDaysBranch = async (req, res) => {
   try {
-    const { month, deptId } = req.query;
+    const { month, deptId, classificationId } = req.query;
     if (!month) return res.status(400).json({ message: "Month is required" });
 
     const endDate = `${month}-31`;
 
-    // Get department name for title
-    let deptName = "TPBI";
-    if (deptId === "all" || deptId === "" || deptId === null) {
-      deptName = "ALL DEPARTMENTS";
-    } else if (deptId) {
-      const dept = await db.dept.findByPk(deptId);
-      if (dept && dept.name) deptName = dept.name;
-    }
-
-    const branches = await db.branch.findAll({ attributes: ["id", "name"] });
+    // Get all branches
+    const branches = await db.branch.findAll({
+      attributes: ["id", "name", "brCode"], // changed from branchCode to brCode
+    });
     const branchMap = {};
     branches.forEach((b) => {
-      branchMap[String(b.id)] = b.name;
+      branchMap[String(b.id)] = { name: b.name, code: b.brCode || b.name }; // changed from branchCode to brCode
     });
 
+    // Get all departments and classifications
+    const depts = await db.dept.findAll({ attributes: ["id", "name"] });
+    const deptMap = {};
+    depts.forEach((d) => {
+      deptMap[String(d.id)] = d.name;
+    });
+
+    const subDepts = await db.subDept.findAll({
+      attributes: ["id", "subCode"],
+    });
+    const subDeptMap = {};
+    subDepts.forEach((sd) => {
+      subDeptMap[String(sd.id)] = sd.subCode;
+    });
+
+    // Build where clause for outstanding files
     const where = {
-      fileStatus: { [db.Sequelize.Op.notIn]: ["CLO", "CLOSED", "CANC"] },
-      dateOfAssign: { [db.Sequelize.Op.lte]: endDate },
+      fileStatus: { [Op.notIn]: ["CLO", "CLOSED", "CANC"] },
+      dateOfAssign: { [Op.lte]: endDate },
       ...(deptId && deptId !== "all" && { refType: deptId }),
+      ...(classificationId &&
+        classificationId !== "all" && { subRefType: classificationId }),
     };
 
+    // Get all outstanding (not closed) files assigned at any time, not closed as of end of month
     const files = await db.casefiles.findAll({
       where,
-      attributes: ["branch", "dateOfAssign", "id"],
+      attributes: ["branch", "refType", "subRefType", "dateOfAssign", "id"],
     });
 
-    const buckets = {};
+    // Grouping logic (same as API)
+    const result = {};
     files.forEach((file) => {
-      const branchName = branchMap[file.branch] || "Unknown";
-      if (!buckets[branchName]) {
-        buckets[branchName] = {
-          below30: 0,
-          above30: 0,
-          above45: 0,
-          above60: 0,
-          above90: 0,
-          total: 0,
+      const branchId = String(file.branch);
+      if (!result[branchId])
+        result[branchId] = {
+          summary: {
+            below30: 0,
+            above30: 0,
+            above45: 0,
+            above60: 0,
+            above90: 0,
+            total: 0,
+          },
+          details: {},
         };
-      }
+
       let days = 0;
       if (file.dateOfAssign) {
         days = Math.abs(
@@ -147,21 +214,46 @@ exports.exportOutstandingDaysBranch = async (req, res) => {
           )
         );
       }
-      if (days < 30) buckets[branchName].below30 += 1;
-      if (days >= 30 && days < 45) buckets[branchName].above30 += 1;
-      if (days >= 45 && days < 60) buckets[branchName].above45 += 1;
-      if (days >= 60 && days < 90) buckets[branchName].above60 += 1;
-      if (days >= 90) buckets[branchName].above90 += 1;
-      buckets[branchName].total += 1;
+      let bucket = "";
+      if (days < 30) bucket = "below30";
+      else if (days >= 30 && days < 45) bucket = "above30";
+      else if (days >= 45 && days < 60) bucket = "above45";
+      else if (days >= 60 && days < 90) bucket = "above60";
+      else if (days >= 90) bucket = "above90";
+
+      // Summary
+      result[branchId].summary[bucket] += 1;
+      result[branchId].summary.total += 1;
+
+      // Details by dept/classification
+      const deptKey = String(file.refType || "");
+      const classKey = String(file.subRefType || "");
+      const detailKey = `${deptKey}-${classKey}`;
+      if (!result[branchId].details[detailKey]) {
+        result[branchId].details[detailKey] = {
+          dept: deptMap[deptKey] || deptKey,
+          class: subDeptMap[classKey] || classKey,
+          below30: 0,
+          above30: 0,
+          above45: 0,
+          above60: 0,
+          above90: 0,
+          total: 0,
+        };
+      }
+      result[branchId].details[detailKey][bucket] += 1;
+      result[branchId].details[detailKey].total += 1;
     });
 
-    const reportData = Object.entries(buckets).map(([branch, counts]) => ({
-      branch,
-      ...counts,
-    }));
-
-    // Sort branches alphabetically
-    reportData.sort((a, b) => a.branch.localeCompare(b.branch));
+    // Prepare reportData
+    const reportData = Object.entries(result)
+      .map(([branchId, data]) => ({
+        branch: branchMap[branchId]?.name || "Unknown",
+        branchCode: branchMap[branchId]?.code || branchId,
+        ...data.summary,
+        details: Object.values(data.details),
+      }))
+      .sort((a, b) => a.branchCode.localeCompare(b.branchCode));
 
     // Totals
     const totals = {
@@ -184,6 +276,8 @@ exports.exportOutstandingDaysBranch = async (req, res) => {
     // Excel generation
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Outstanding By Days (Branch)");
+    const totalCols = 7;
+    const lastColLetter = String.fromCharCode(64 + totalCols); // G
 
     // --- Title row ---
     const monthObj = new Date(`${month}-31`);
@@ -191,9 +285,9 @@ exports.exportOutstandingDaysBranch = async (req, res) => {
       .toLocaleString("default", { month: "long" })
       .toUpperCase();
     const year = monthObj.getFullYear();
-    const titleText = `${deptName.toUpperCase()} OUTSTANDING BY DAYS - BRANCH - AS OF ${monthObj.getDate()} ${monthName} ${year}`;
-    sheet.addRow([titleText]);
-    sheet.mergeCells("A1:G1");
+    const titleText = `OUTSTANDING BY DAYS - BRANCH - AS OF ${monthObj.getDate()} ${monthName} ${year}`;
+    sheet.addRow([titleText, "", "", "", "", "", ""]);
+    sheet.mergeCells(`A1:${lastColLetter}1`);
     const titleRow = sheet.getRow(1);
     titleRow.height = 32;
     titleRow.getCell(1).font = { name: "Calibri", size: 12, bold: true };
@@ -214,7 +308,7 @@ exports.exportOutstandingDaysBranch = async (req, res) => {
     ];
     sheet.addRow(headerValues);
     const headerRow = sheet.getRow(2);
-    headerRow.height = 41.25;
+    headerRow.height = 35;
     headerRow.eachCell((cell) => {
       cell.font = {
         name: "Calibri",
@@ -241,11 +335,11 @@ exports.exportOutstandingDaysBranch = async (req, res) => {
       cell.value = String(cell.value).toUpperCase();
     });
 
-    // --- Data rows ---
     let rowIdx = 3;
-    reportData.forEach((row) => {
+    for (const row of reportData) {
+      // Summary row
       const values = [
-        row.branch.toUpperCase(),
+        String(row.branchCode || row.branch).toUpperCase(),
         row.below30,
         row.above30,
         row.above45,
@@ -256,12 +350,17 @@ exports.exportOutstandingDaysBranch = async (req, res) => {
       sheet.addRow(values);
       const dataRow = sheet.getRow(rowIdx);
       dataRow.height = 18;
+      // Left align branch column, bold
       dataRow.getCell(1).font = { name: "Calibri", size: 11, bold: true };
+      dataRow.getCell(1).alignment = { vertical: "middle", horizontal: "left" };
       for (let col = 2; col <= 7; col++) {
         dataRow.getCell(col).font = { name: "Calibri", size: 11, bold: false };
+        dataRow.getCell(col).alignment = {
+          vertical: "middle",
+          horizontal: "center",
+        };
       }
       dataRow.eachCell((cell, colNumber) => {
-        cell.alignment = { vertical: "middle", horizontal: "center" };
         cell.border = {
           top: { style: "thin" },
           left: { style: "thin" },
@@ -270,7 +369,50 @@ exports.exportOutstandingDaysBranch = async (req, res) => {
         };
       });
       rowIdx++;
-    });
+
+      // Detail rows
+      for (const detail of row.details) {
+        const detailLabel = `${String(
+          row.branchCode || row.branch
+        ).toUpperCase()} (${detail.dept} - ${detail.class})`;
+        sheet.addRow([
+          detailLabel,
+          detail.below30,
+          detail.above30,
+          detail.above45,
+          detail.above60,
+          detail.above90,
+          detail.total,
+        ]);
+        const detailRow = sheet.getRow(rowIdx);
+        detailRow.height = 18;
+        detailRow.getCell(1).font = { name: "Calibri", size: 11, bold: false };
+        detailRow.getCell(1).alignment = {
+          vertical: "middle",
+          horizontal: "left",
+        };
+        for (let col = 2; col <= 7; col++) {
+          detailRow.getCell(col).font = {
+            name: "Calibri",
+            size: 11,
+            bold: false,
+          };
+          detailRow.getCell(col).alignment = {
+            vertical: "middle",
+            horizontal: "center",
+          };
+        }
+        detailRow.eachCell((cell, colNumber) => {
+          cell.border = {
+            top: { style: "thin" },
+            left: { style: "thin" },
+            bottom: { style: "thin" },
+            right: { style: "thin" },
+          };
+        });
+        rowIdx++;
+      }
+    }
 
     // --- Total row ---
     sheet.addRow([
@@ -284,14 +426,26 @@ exports.exportOutstandingDaysBranch = async (req, res) => {
     ]);
     const totalRow = sheet.getRow(rowIdx);
     totalRow.height = 18;
-    totalRow.eachCell((cell, colNumber) => {
-      cell.font = {
+    totalRow.getCell(1).font = {
+      name: "Calibri",
+      size: 11,
+      bold: true,
+      color: { argb: "FFFFFFFF" },
+    };
+    totalRow.getCell(1).alignment = { vertical: "middle", horizontal: "left" };
+    for (let col = 2; col <= 7; col++) {
+      totalRow.getCell(col).font = {
         name: "Calibri",
         size: 11,
         bold: true,
         color: { argb: "FFFFFFFF" },
       };
-      cell.alignment = { vertical: "middle", horizontal: "center" };
+      totalRow.getCell(col).alignment = {
+        vertical: "middle",
+        horizontal: "center",
+      };
+    }
+    totalRow.eachCell((cell, colNumber) => {
       cell.fill = {
         type: "pattern",
         pattern: "solid",
@@ -332,7 +486,7 @@ exports.exportOutstandingDaysBranch = async (req, res) => {
     };
 
     // --- Set column widths ---
-    sheet.getColumn(1).width = 28;
+    sheet.getColumn(1).width = 38;
     for (let i = 2; i <= 7; i++) {
       sheet.getColumn(i).width = 18;
     }
@@ -348,6 +502,7 @@ exports.exportOutstandingDaysBranch = async (req, res) => {
     await workbook.xlsx.write(res);
     res.end();
   } catch (err) {
+    console.error(err); // Add this line for debugging
     res.status(500).json({ message: err.message });
   }
 };
