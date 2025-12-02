@@ -16,6 +16,18 @@ module.exports = (app) => {
   // Retrieve paginated closed/cancelled casefiles (CANC or CLO)
   router.get("/paginated-closed", casefiles.findPaginatedClosed);
 
+  // Retrieve paginated permitted active casefiles (not CANC or CLO)
+  router.get(
+    "/paginated-permitted-active",
+    casefiles.findPaginatedPermittedActive
+  );
+
+  // Retrieve paginated permitted closed/cancelled casefiles (CANC or CLO)
+  router.get(
+    "/paginated-permitted-closed",
+    casefiles.findPaginatedPermittedClosed
+  );
+
   // Retrieve all casefiles
   router.get("/", async (req, res) => {
     try {

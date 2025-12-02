@@ -821,3 +821,87 @@ exports.findOverdueCases = async (req, res) => {
     });
   }
 };
+
+// Retrieve paginated permitted Casefiles except fileStatus "CANC" or "CLO"
+exports.findPaginatedPermittedActive = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 30;
+    const offset = (page - 1) * pageSize;
+    // User/role-based constraints
+    let where = {
+      fileStatus: { [db.Sequelize.Op.notIn]: ["CANC", "CLO"] },
+      ...buildUserWhere(req.query),
+      ...buildFilters(req.query),
+    };
+
+    // LOGGING for debugging
+    // console.log("findPaginatedPermittedActive: req.query =", req.query);
+    // console.log("findPaginatedPermittedActive: where =", JSON.stringify(where));
+
+    const daysDiffExpr = db.Sequelize.literal(`DATEDIFF(NOW(), dateOfAssign)`);
+
+    const { count, rows } = await Casefile.findAndCountAll({
+      where,
+      limit: pageSize,
+      offset,
+      attributes: {
+        include: [[daysDiffExpr, "days"]],
+      },
+      order: [[daysDiffExpr, "DESC"]],
+    });
+
+    res.send({
+      data: rows,
+      total: count,
+      page,
+      pageSize,
+    });
+  } catch (err) {
+    res.status(500).send({
+      message: err.message || "Error retrieving permitted active Casefiles.",
+    });
+  }
+};
+
+// Retrieve paginated permitted Casefiles with fileStatus "CANC" or "CLO" only
+exports.findPaginatedPermittedClosed = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 30;
+    const offset = (page - 1) * pageSize;
+    // User/role-based constraints
+    let where = {
+      fileStatus: { [db.Sequelize.Op.in]: ["CANC", "CLO"] },
+      ...buildUserWhere(req.query),
+      ...buildFilters(req.query),
+    };
+
+    // LOGGING for debugging
+    console.log("findPaginatedPermittedClosed: req.query =", req.query);
+    console.log("findPaginatedPermittedClosed: where =", JSON.stringify(where));
+
+    const daysDiffExpr = db.Sequelize.literal(`DATEDIFF(NOW(), dateOfAssign)`);
+
+    const { count, rows } = await Casefile.findAndCountAll({
+      where,
+      limit: pageSize,
+      offset,
+      attributes: {
+        include: [[daysDiffExpr, "days"]],
+      },
+      order: [[daysDiffExpr, "DESC"]],
+    });
+
+    res.send({
+      data: rows,
+      total: count,
+      page,
+      pageSize,
+    });
+  } catch (err) {
+    res.status(500).send({
+      message: err.message || "Error retrieving permitted closed Casefiles.",
+    });
+  }
+};
